@@ -10,6 +10,8 @@ colors = {
     'Rapgap':'darkorange',
     'Sherpa':'crimson',
     'Cascade':'b',
+    'PCT': 'g',
+    'MLP':'blueviolet',
 }
 
 
@@ -28,6 +30,9 @@ styles = {
 markers = {
     'Djangoh':'D',
     'Rapgap':'X',
+
+    'PCT':'P',
+    'MLP':'o',
 }
 
 # dedicated_binning = {
@@ -61,6 +66,7 @@ dedicated_binning = {
     'gen_jet_ncharged':np.linspace(1,15,15),
     'gen_jet_charge':np.linspace(-1,1,30),
     'genjet_pt': np.logspace(np.log10(10),np.log10(100),30),
+    'gen_Q2': np.logspace(np.log10(150),np.log10(1000),30),
     'genjet_eta':np.linspace(-1,2.5,6),
     'genjet_phi':np.linspace(-3.14,3.14,8),
 
@@ -70,7 +76,6 @@ dedicated_binning = {
 
 
     'gen_jet_ptD':np.linspace(0.2,1,30),
-    'gen_Q2':np.logspace(np.log10(150),np.log10(10000),30),
 
 
     'gene_px':np.logspace(np.log10(1),np.log10(100),7),
