@@ -140,7 +140,7 @@ class Multifold():
                 base_name+='_PCT'
                 log_name+='_PCT'
                 
-            callbacks.append(ModelCheckpoint('weights/{}_{}_iter{}_step{}.h5'.format(base_name,self.version,iteration,stepn),save_best_only=True,mode='auto',period=1,save_weights_only=True))
+            callbacks.append(ModelCheckpoint('../weights/{}_{}_iter{}_step{}.h5'.format(base_name,self.version,iteration,stepn),save_best_only=True,mode='auto',period=1,save_weights_only=True))
             callbacks.append(TensorBoard(log_dir="logs/{}_{}_step{}".format(log_name,self.version,stepn)))
         
         hist =  self.model.fit(train_data,

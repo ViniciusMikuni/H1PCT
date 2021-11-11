@@ -196,7 +196,7 @@ for var in gen_var_names:
     plt.ylim([-20,20])
     #plt.tight_layout()
     
-    plot_folder = 'plots_'+data_name if flags.closure==False else 'plots_closure'
+    plot_folder = '../plots_'+data_name if flags.closure==False else 'plots_closure'
     if flags.pct:
         plot_folder+='_pct'
     if not os.path.exists(plot_folder):
