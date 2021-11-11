@@ -130,7 +130,7 @@ class Multifold():
             base_name+='_PCT'
 
         callbacks = [
-            ModelCheckpoint('weights/{}_{}_iter{}_step{}.h5'.format(base_name,self.version,iteration,stepn),save_best_only=True,mode='auto',period=1,save_weights_only=True),
+            ModelCheckpoint('../weights/{}_{}_iter{}_step{}.h5'.format(base_name,self.version,iteration,stepn),save_best_only=True,mode='auto',period=1,save_weights_only=True),
             EarlyStopping(patience=10,restore_best_weights=True)
         ]
 

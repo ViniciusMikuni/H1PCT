@@ -24,7 +24,7 @@ opt.SetStyle()
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--data_folder', default='/clusterfs/ml4hep/vmikuni/H1/jet_subs/h5', help='Folder containing data and MC files')
-#parser.add_argument('--data_folder', default='/pscratch/sd/v/vmikuni', help='Folder containing data and MC files')
+parser.add_argument('--weights', default='../weights', help='Folder to store trained weights')
 parser.add_argument('--closure', action='store_true', default=False,help='Plot closure results')
 parser.add_argument('--comp', action='store_true', default=False,help='Compare closure unc. from different methods')
 parser.add_argument('--pct', action='store_true', default=False,help='Load pct results')
@@ -88,7 +88,7 @@ class MCInfo():
         base_name = "Omnifold"
         if pct:
             base_name+='_PCT'            
-        model_name = 'weights/{}_{}_iter{}_step2.h5'.format(base_name,version,niter)
+        model_name = '{}/{}_{}_iter{}_step2.h5'.format(flags.weights,base_name,version,niter)
 
         data = np.concatenate([np.expand_dims(self.predictions[var][:self.N],-1) for var in var_names],-1)
 
@@ -197,7 +197,7 @@ for var in gen_var_names:
 
     plt.ylim([-20,20])
     
-    plot_folder = 'plots_'+data_name if flags.closure==False else 'plots_closure'
+    plot_folder = '../plots_'+data_name if flags.closure==False else 'plots_closure'
     if flags.pct:
         plot_folder+='_pct'
     if not os.path.exists(plot_folder):
