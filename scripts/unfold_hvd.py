@@ -37,7 +37,6 @@ class Multifold():
         self.version = version
         self.pct = pct
         self.Q2=Q2
-        
 
     def Unfold(self):
         self.BATCH_SIZE=5000
@@ -46,7 +45,7 @@ class Multifold():
         self.weights_push = np.ones(self.weights_mc.shape[0])
         for i in range(self.niter):
             self.iter = i
-            self.CompileModel(max(1e-4/(2**i),1e-7))
+            self.CompileModel(max(1e-4*np.exp(-i/10.),1e-7))
             print("ITERATION: {}".format(i + 1))
             self.RunStep1(i)
             self.RunStep2(i)
@@ -167,12 +166,12 @@ class Multifold():
             self.not_pass_gen = self.mc_gen[:,0]==-10
             
         if weights_mc is None:
-            self.weights_mc = np.ones(len(mc_reco))
+            self.weights_mc = np.ones(len(self.mc_reco))
         else:
             self.weights_mc = weights_mc
     
         if weights_data is None:
-            self.weights_data = np.ones(len(data))
+            self.weights_data = np.ones(len(self.data))
         else:
             self.weights_data =weights_data
 
@@ -197,7 +196,8 @@ class Multifold():
         
         self.model.compile(loss=weighted_binary_crossentropy,
                            optimizer=opt,
-                           experimental_run_tf_function=False)
+                           experimental_run_tf_function=False
+        )
         
             
     def PrepareModel(self):
