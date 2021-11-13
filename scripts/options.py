@@ -1,5 +1,6 @@
 import numpy as np
-
+import matplotlib.pyplot as plt
+from matplotlib import gridspec
 colors = {
     'LO':'b', 
     'NLO':'g',
@@ -66,7 +67,7 @@ dedicated_binning = {
     'gen_jet_ncharged':np.linspace(1,15,15),
     'gen_jet_charge':np.linspace(-1,1,30),
     'genjet_pt': np.logspace(np.log10(10),np.log10(100),30),
-    'gen_Q2': np.logspace(np.log10(150),np.log10(1000),30),
+    'gen_Q2': np.logspace(np.log10(150),np.log10(2000),30),
     'genjet_eta':np.linspace(-1,2.5,6),
     'genjet_phi':np.linspace(-3.14,3.14,8),
 
@@ -81,6 +82,22 @@ dedicated_binning = {
     'gene_px':np.logspace(np.log10(1),np.log10(100),7),
     'gene_py':np.logspace(np.log10(1),np.log10(100),7),
     'gene_pz':np.logspace(np.log10(1),np.log10(100),7),
+
+    'jet_ncharged':np.linspace(1,10,10),
+    'jet_charge':np.linspace(-1,1,7),
+    'jet_pt': np.logspace(np.log10(10),np.log10(100),7),
+    'Q2': np.logspace(np.log10(150),np.log10(2000),7),
+    'jet_eta':np.linspace(-1,2.5,6),
+    'jet_phi':np.linspace(-3.14,3.14,8),
+
+    'jet_tau10':np.linspace(-3,-0.1,7),
+    'jet_tau15':np.linspace(-4,-0.5,7),
+    'jet_tau20':np.linspace(-5,-0.5,7),
+
+
+    'jet_ptD':np.linspace(0.2,1,7),
+
+
 }
 
 
@@ -109,3 +126,28 @@ def SetStyle():
     import mplhep as hep
     hep.set_style(hep.style.CMS)
     hep.style.use("CMS") 
+
+
+def SetGrid(ratio=True):
+    fig = plt.figure(figsize=(9, 9))
+    if ratio:
+        gs = gridspec.GridSpec(2, 1, height_ratios=[3,1]) 
+        gs.update(wspace=0.025, hspace=0.1)
+    else:
+        gs = gridspec.GridSpec(1, 1)
+    return fig,gs
+
+def FormatFig(xlabel,ylabel,ax0):
+    #Limit number of ddigits in ticks
+    # y_loc, _ = plt.yticks()
+    # y_update = ['%.1f' % y for y in y_loc]
+    # plt.yticks(y_loc, y_update) 
+    plt.xlabel(xlabel,fontsize=20)
+    plt.ylabel(ylabel)
+        
+
+    xposition = 0.8
+    plt.text(xposition, 0.92,'H1 Internal',
+             horizontalalignment='center',
+             verticalalignment='center',
+             transform = ax0.transAxes, fontsize=25, fontweight='bold')

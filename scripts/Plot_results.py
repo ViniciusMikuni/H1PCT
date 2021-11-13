@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 from matplotlib.colors import LogNorm
 from sklearn.preprocessing import StandardScaler
-from matplotlib import gridspec
 from matplotlib.font_manager import FontProperties
 from numpy import inf
 import argparse
@@ -46,7 +45,7 @@ folder = 'results'
 if flags.closure:
     version = 'closure'
 else:
-    version = 'nominal'
+    version = 'baseline'
 
 
 gen_var_names = {
@@ -129,25 +128,6 @@ else:
     weight_data = weights_data['MLP']
         
 
-def SetGrid():
-    fig = plt.figure(figsize=(9, 9))
-    gs = gridspec.GridSpec(2, 1, height_ratios=[3,1]) 
-    gs.update(wspace=0.025, hspace=0.1)
-    return fig,gs
-
-def FormatFig(xlabel,ylabel):
-    y_loc, _ = plt.yticks()
-    y_update = ['%.2f' % y for y in y_loc]
-    plt.yticks(y_loc, y_update)    
-    plt.xlabel(xlabel,fontsize=20)
-    plt.ylabel(ylabel)
-        
-
-    xposition = 0.8
-    plt.text(xposition, 0.92,'H1 Internal',
-             horizontalalignment='center',
-             verticalalignment='center',
-             transform = ax0.transAxes, fontsize=25, fontweight='bold')
 
 
 
@@ -160,13 +140,13 @@ for var in gen_var_names:
     if 'tau' in var:
         data_var = np.log(data_var)    
 
-    fig,gs = SetGrid() 
+    fig,gs = opt.SetGrid() 
     ax0 = plt.subplot(gs[0])
     
 
     data_pred,_,_=ax0.hist(data_var,weights=weight_data[mask]*mc_info[data_name].nominal_wgts[mask],bins=binning,label="Data",density=True,color="black",histtype="step")
 
-    FormatFig(xlabel = "", ylabel = r'$1/\sigma$ $\mathrm{d}\sigma/\mathrm{d}$%s'%gen_var_names[var])
+    opt.FormatFig(xlabel = "", ylabel = r'$1/\sigma$ $\mathrm{d}\sigma/\mathrm{d}$%s'%gen_var_names[var],ax0=ax0)
     
     ratios = {}
     for mc in mc_names:
@@ -197,7 +177,7 @@ for var in gen_var_names:
 
     plt.ylim([-20,20])
     
-    plot_folder = '../plots_'+data_name if flags.closure==False else 'plots_closure'
+    plot_folder = '../plots_'+data_name if flags.closure==False else '../plots_closure'
     if flags.pct:
         plot_folder+='_pct'
     if not os.path.exists(plot_folder):
@@ -206,7 +186,7 @@ for var in gen_var_names:
 
     if flags.comp:
         #Compare the non-closure uncertainty
-        fig,gs = SetGrid() 
+        fig,gs = opt.SetGrid() 
         ax0 = plt.subplot(gs[0])
         
 
@@ -217,7 +197,7 @@ for var in gen_var_names:
         mask = mc_info[mc_ref].fiducial_masks==1
         mc_pred,_,_=ax0.hist(mc_var,weights=mc_info[mc_ref].nominal_wgts[mask],bins=binning,label="Target Gen",density=True,color="black",histtype="step")
 
-        FormatFig(xlabel = "", ylabel = r'$1/\sigma$ $\mathrm{d}\sigma/\mathrm{d}$%s'%gen_var_names[var])
+        opt.FormatFig(xlabel = "", ylabel = r'$1/\sigma$ $\mathrm{d}\sigma/\mathrm{d}$%s'%gen_var_names[var])
 
         ratios = {}        
         mask = mc_info[data_name].fiducial_masks==1
