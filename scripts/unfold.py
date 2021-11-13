@@ -157,12 +157,12 @@ class Multifold():
         self.not_pass_gen = self.mc_gen[:,0]==-10
 
         if weights_mc is None:
-            self.weights_mc = np.ones(len(mc_reco))
+            self.weights_mc = np.ones(self.mc_reco.shape[0])
         else:
             self.weights_mc = weights_mc
 
         if weights_data is None:
-            self.weights_data = np.ones(len(data))
+            self.weights_data = np.ones(self.data.shape[0])
         else:
             self.weights_data =weights_data
 
