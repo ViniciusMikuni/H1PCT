@@ -22,7 +22,7 @@ opt.SetStyle()
 parser = argparse.ArgumentParser()
 
 #parser.add_argument('--data_folder', default='/global/cfs/cdirs/m1759/vmikuni/H1/pkl', help='Folder containing data and MC files')
-parser.add_argument('--data_folder', default='/pscratch/sd/v/vmikuni', help='Folder containing data and MC files')
+parser.add_argument('--data_folder', default='/pscratch/sd/v/vmikuni/H1', help='Folder containing data and MC files')
 parser.add_argument('--closure', action='store_true', default=False,help='Plot closure results')
 parser.add_argument('--pct', action='store_true', default=False,help='Load pct results')
 parser.add_argument('--comp', action='store_true', default=False,help='Compare the non-closure unc between methods')
@@ -47,9 +47,9 @@ else:
 
 
 gen_var_names = {
-    'genjet_pt': r"$p_\mathrm{T}^\mathrm{jet}$",
-    'genjet_eta':r'$\eta^\mathrm{jet}$',
-    'gen_Q2':r'$Q^2$',
+    # 'genjet_pt': r"$p_\mathrm{T}^\mathrm{jet}$",
+    # 'genjet_eta':r'$\eta^\mathrm{jet}$',
+    # 'gen_Q2':r'$Q^2$',
 
 
     # 'genjet_phi':r'$\phi^\mathrm{jet}$',
@@ -58,7 +58,7 @@ gen_var_names = {
     'gen_jet_ptD':r'$p_\mathrm{T}\mathrm{D}^\mathrm{jet}$',
     'gen_jet_tau10':r'$\mathrm{log}(\tau_{1}^\mathrm{jet})$', 
     'gen_jet_tau15':r'$\mathrm{log}(\tau_{0.5}^\mathrm{jet})$',
-    'gen_jet_tau20':r'$\mathrm{log}(\tau_{0}^\mathrm{jet})$',
+    # 'gen_jet_tau20':r'$\mathrm{log}(\tau_{0}^\mathrm{jet})$',
 
     # 'gene_px':'e px',
     # 'gene_py':'e px',
