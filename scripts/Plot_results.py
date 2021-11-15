@@ -27,7 +27,7 @@ parser.add_argument('--weights', default='../weights', help='Folder to store tra
 parser.add_argument('--closure', action='store_true', default=False,help='Plot closure results')
 parser.add_argument('--comp', action='store_true', default=False,help='Compare closure unc. from different methods')
 parser.add_argument('--pct', action='store_true', default=False,help='Load pct results')
-parser.add_argument('-N', type=int,default=5e6, help='Number of events to evaluate')
+parser.add_argument('-N', type=int,default=20e6, help='Number of events to evaluate')
 parser.add_argument('--niter', type=int, default=9, help='Omnifold iteration to load')
 
 flags = parser.parse_args()
@@ -50,8 +50,8 @@ else:
 
 gen_var_names = {
     'gen_Q2': r"$Q^2$",
-    # 'genjet_pt': r"$p_\mathrm{T}^\mathrm{jet}$",
-    # 'genjet_eta':r'$\eta^\mathrm{jet}$',
+    'genjet_pt': r"$p_\mathrm{T}^\mathrm{jet}$",
+    'genjet_eta':r'$\eta^\mathrm{jet}$',
 
 
     # 'genjet_phi':r'$\phi^\mathrm{jet}$',
@@ -197,7 +197,7 @@ for var in gen_var_names:
         mask = mc_info[mc_ref].fiducial_masks==1
         mc_pred,_,_=ax0.hist(mc_var,weights=mc_info[mc_ref].nominal_wgts[mask],bins=binning,label="Target Gen",density=True,color="black",histtype="step")
 
-        opt.FormatFig(xlabel = "", ylabel = r'$1/\sigma$ $\mathrm{d}\sigma/\mathrm{d}$%s'%gen_var_names[var])
+        opt.FormatFig(xlabel = "", ylabel = r'$1/\sigma$ $\mathrm{d}\sigma/\mathrm{d}$%s'%gen_var_names[var],ax0=ax0)
 
         ratios = {}        
         mask = mc_info[data_name].fiducial_masks==1
@@ -226,7 +226,7 @@ for var in gen_var_names:
 
         plt.ylim([-20,20])
     
-        plot_folder = 'plots_comp'
+        plot_folder = '../plots_comp'
         if not os.path.exists(plot_folder):
             os.makedirs(plot_folder)
         fig.savefig(os.path.join(plot_folder,"{}.pdf".format(var)))
