@@ -175,7 +175,7 @@ def PCT(npoints,nvars):
 
     batch_size = tf.shape(inputs)[0]
             
-    k = 10
+    k = 5
     mask = tf.where(inputs[:,:,2]==0,K.ones_like(inputs[:,:,2]),K.zeros_like(inputs[:,:,2]))
     adj,mask_matrix = pairwise_distanceR(inputs[:,:,:3],mask)    
     nn_idx = knn(adj, k=k)    

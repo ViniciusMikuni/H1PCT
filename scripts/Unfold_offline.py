@@ -25,7 +25,7 @@ parser.add_argument('--data_folder', default='/clusterfs/ml4hep/vmikuni/H1/jet_s
 parser.add_argument('--nvars', type=int, default=10, help='Number of distributions to unfold')
 parser.add_argument('--niter', type=int,default=5, help='Number of omnifold iterations')
 parser.add_argument('--ntrain', type=int,default=5, help='Number of independent trainings to perform')
-parser.add_argument('--nevts', type=int,default=10000000, help='Number of events to load')
+parser.add_argument('--nevts', type=int,default=10e6, help='Number of events to load')
 parser.add_argument('--reload', action='store_true', default=False,help='Redo the data preparation steps')
 parser.add_argument('--unfold', action='store_true', default=False,help='Train omnifold')
 parser.add_argument('--closure', action='store_true', default=False,help='Train omnifold for a closure test using simulation')
@@ -52,15 +52,22 @@ if flags.pct:
 
 
 if flags.reload:
-    # data = get_Dataframe(flags.data_folder, name='Data', tag=data_tag, pct=flags.pct,verbose=True)
+    # data = get_Dataframe(flags.data_folder, name='Data', tag='nominal', pct=flags.pct,verbose=True)
     # #print(data.keys())
     # data = applyCutsJets(data,verbose=True,pct=flags.pct)
-    # data.to_pickle(os.path.join(flags.data_folder,'pkl','data.pkl' if flags.pct == False else 'data_pct.pkl'))
+    # with h5.File(os.path.join('/clusterfs/ml4hep/vmikuni/H1/jet_subs/','h5',"data.h5"),'w') as fh5:
+    #     for key in data:
+    #         print(key)
+    #         if 'part' in key:
+    #             feat = np.array([ entry for entry in data[key].to_numpy()])
+    #             feat = feat.reshape((len(feat),20)).astype(float)                    
+    #             dset = fh5.create_dataset(key, data=feat)
+    #         else:
+    #             dset = fh5.create_dataset(key, data=data[key].to_numpy(dtype=np.float32))
     
     for name,tag in zip(mc_names,mc_tags):
         mc = get_Dataframe(flags.data_folder, name=name, tag=tag, pct=flags.pct,verbose=True)
         mc   = applyCutsJets(mc, isMC=True,verbose=True,pct=flags.pct)
-        #if flags.pct:tag+='_pct'
         with h5.File(os.path.join('/clusterfs/ml4hep/vmikuni/H1/jet_subs/','h5',"{}_{}.h5".format(name,tag)),'w') as fh5:
             for key in mc:
                 print(key)
@@ -71,7 +78,7 @@ if flags.reload:
                 else:
                     dset = fh5.create_dataset(key, data=mc[key].to_numpy(dtype=np.float32))
             
-
+nevts=int(flags.nevts)
 data_name = 'data'
 if flags.closure:
     data_name = 'Djangoh_nominal'
@@ -84,25 +91,25 @@ for name,tag in zip(mc_names,mc_tags):
     mc = h5.File(os.path.join(flags.data_folder,"{}.h5".format(mc_name)),'r')    
 
     data = h5.File(os.path.join(flags.data_folder,"{}.h5".format(data_name)),'r')
-    data_vars = np.concatenate([np.expand_dims(data[var][:flags.nevts],-1) for var in var_names],-1)    
-    Q2['data'] =  np.ma.log(data['Q2'][:flags.nevts]).filled(0)
+    data_vars = np.concatenate([np.expand_dims(data[var][:nevts],-1) for var in var_names],-1)    
+    Q2['data'] =  np.ma.log(data['Q2'][:nevts]).filled(-1)/2.0
 
     if flags.closure:
-        weights_data = data['wgt'][:flags.nevts]
-        pass_reco = data['pass_reco'][:flags.nevts] #pass reco selection
+        weights_data = data['wgt'][:nevts]
+        pass_reco = data['pass_reco'][:nevts] #pass reco selection
         weights_data = weights_data[pass_reco==1]
         data_vars = data_vars[pass_reco==1]
         Q2['data'] =Q2['data'][pass_reco==1]
         weights_data = weights_data/np.average(weights_data)
 
 
-    mc_reco = np.concatenate([np.expand_dims(mc[var][:flags.nevts],-1) for var in var_names],-1)
-    Q2['reco'] = np.ma.log(mc['Q2'][:flags.nevts]).filled(0)
-    mc_gen = np.concatenate([np.expand_dims(mc[var][:flags.nevts],-1) for var in gen_names],-1)
+    mc_reco = np.concatenate([np.expand_dims(mc[var][:nevts],-1) for var in var_names],-1)
+    Q2['reco'] = np.ma.log(mc['Q2'][:nevts]).filled(-1)/2.0
+    mc_gen = np.concatenate([np.expand_dims(mc[var][:nevts],-1) for var in gen_names],-1)
 
-    weights_MC_sim = mc['wgt'][:flags.nevts]
-    pass_reco = mc['pass_reco'][:flags.nevts] #pass fiducial selection
-    pass_truth = mc['pass_truth'][:flags.nevts] #pass gen region definition
+    weights_MC_sim = mc['wgt'][:nevts]
+    pass_reco = mc['pass_reco'][:nevts] #pass fiducial selection
+    pass_truth = mc['pass_truth'][:nevts] #pass gen region definition
     del mc
     del data
 
