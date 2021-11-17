@@ -10,7 +10,7 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import EarlyStopping,ModelCheckpoint,TensorBoard
 from pct import PCT
-
+import time
 import horovod.tensorflow.keras as hvd
 
 
@@ -37,19 +37,36 @@ class Multifold():
         self.version = version
         self.pct = pct
         self.Q2=Q2
+        self.timing_log = 'time_keeper_{}'.format(self.version)
+        if self.pct:
+            self.timing_log +='_PCT'
+        self.timing_file = open('time_keeper/{}.txt'.format(self.timing_log),'w')
 
     def Unfold(self):
         self.BATCH_SIZE=5000
         self.EPOCHS=1000
         self.weights_pull = np.ones(self.weights_mc.shape[0])
         self.weights_push = np.ones(self.weights_mc.shape[0])
+        time_steps_1 = []
+        time_steps_2 = []
         for i in range(self.niter):
             self.iter = i
-            self.CompileModel(max(1e-4*np.exp(-i/10.),1e-7))
-            print("ITERATION: {}".format(i + 1))
+            self.CompileModel(max(1e-4/(2**i),1e-7))
+            if hvd.rank() ==0:
+                self.log_string("ITERATION: {}".format(i + 1))
+                start_time = time.time()
             self.RunStep1(i)
+            if hvd.rank() ==0:
+                self.log_string("Total time Step 1: {}".format(time.time()-start_time))
+                time_steps_1.append(time.time()-start_time)
+                start_time = time.time()
             self.RunStep2(i)
-
+            if hvd.rank() ==0:
+                self.log_string("Total time Step 2: {}".format(time.time()-start_time))
+                time_steps_2.append(time.time()-start_time)
+        if hvd.rank() ==0:
+            self.log_string("Average time spent on Step 1: {}".format(np.average(time_steps_1)))
+            self.log_string("Average time spent on Step 2: {}".format(np.average(time_steps_2)))
     def RunStep1(self,i):
         #Data versus reco MC reweighting
         print("RUNNING STEP 1")
@@ -61,12 +78,14 @@ class Multifold():
         else:
             new_weights=self.reweight(self.mc_reco)
         new_weights[self.not_pass_reco]=1.0
-        self.weights_pull = self.weights_push *new_weights 
+        self.weights_pull = self.weights_push *new_weights
+        self.weights_pull = self.weights_pull/np.average(self.weights_pull)
     def RunStep2(self,i):
         #Gen to Gen reweighing
         print("RUNNING STEP 2")
         #self.weights_push*
         #weights = np.concatenate((self.weights_mc, self.weights_pull*self.weights_mc))
+        #weights = np.concatenate((self.weights_push, self.weights_pull))
         weights = np.concatenate((np.ones(self.weights_mc.shape[0]), self.weights_pull))
         self.RunModel(np.concatenate((self.mc_gen, self.mc_gen)),np.concatenate((self.labels_mc, self.labels_gen)),weights,np.concatenate((self.Q2['gen'], self.Q2['gen'])),i,stepn=2)
         
@@ -77,7 +96,7 @@ class Multifold():
         new_weights[self.not_pass_gen]=1.0
         #self.weights_push * 
         self.weights_push = new_weights
-
+        self.weights_push = self.weights_push/np.average(self.weights_push)
     def RunModel(self,sample,labels,weights,Q2,iteration,stepn):
         
         X_train, X_test, Y_train, Y_test, w_train, w_test,q2_train,q2_test = train_test_split(sample, labels, weights,Q2,test_size=0.1)
@@ -140,7 +159,7 @@ class Multifold():
                 log_name+='_PCT'
                 
             callbacks.append(ModelCheckpoint('../weights/{}_{}_iter{}_step{}.h5'.format(base_name,self.version,iteration,stepn),save_best_only=True,mode='auto',period=1,save_weights_only=True))
-            callbacks.append(TensorBoard(log_dir="logs/{}_{}_step{}".format(log_name,self.version,stepn)))
+            #callbacks.append(TensorBoard(log_dir="logs/{}_{}_step{}".format(log_name,self.version,stepn)))
         
         hist =  self.model.fit(train_data,
                           epochs=self.EPOCHS,
@@ -220,3 +239,7 @@ class Multifold():
         return np.squeeze(np.nan_to_num(weights,posinf=1))
 
         
+    def log_string(self,out_str):
+        self.timing_file.write(out_str+'\n')
+        self.timing_file.flush()
+        print(out_str)

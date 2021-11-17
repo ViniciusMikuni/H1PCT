@@ -21,12 +21,12 @@ opt.SetStyle()
 
 parser = argparse.ArgumentParser()
 
-#parser.add_argument('--data_folder', default='/global/cfs/cdirs/m1759/vmikuni/H1/pkl', help='Folder containing data and MC files')
+#parser.add_argument('--data_folder', default='/global/cfs/cdirs/m1759/vmikuni/H1/h5', help='Folder containing data and MC files')
 parser.add_argument('--data_folder', default='/pscratch/sd/v/vmikuni/H1', help='Folder containing data and MC files')
 parser.add_argument('--closure', action='store_true', default=False,help='Plot closure results')
 parser.add_argument('--pct', action='store_true', default=False,help='Load pct results')
 parser.add_argument('--comp', action='store_true', default=False,help='Compare the non-closure unc between methods')
-parser.add_argument('-N', type=int,default=5e6, help='Number of events to evaluate')
+parser.add_argument('-N', type=float,default=5e6, help='Number of events to evaluate')
 parser.add_argument('--niter', type=int, default=9, help='Omnifold iteration to load')
 
 flags = parser.parse_args()
@@ -49,7 +49,7 @@ else:
 gen_var_names = {
     # 'genjet_pt': r"$p_\mathrm{T}^\mathrm{jet}$",
     # 'genjet_eta':r'$\eta^\mathrm{jet}$',
-    # 'gen_Q2':r'$Q^2$',
+    'gen_Q2':r'$Q^2$',
 
 
     # 'genjet_phi':r'$\phi^\mathrm{jet}$',
@@ -58,7 +58,7 @@ gen_var_names = {
     'gen_jet_ptD':r'$p_\mathrm{T}\mathrm{D}^\mathrm{jet}$',
     'gen_jet_tau10':r'$\mathrm{log}(\tau_{1}^\mathrm{jet})$', 
     'gen_jet_tau15':r'$\mathrm{log}(\tau_{0.5}^\mathrm{jet})$',
-    # 'gen_jet_tau20':r'$\mathrm{log}(\tau_{0}^\mathrm{jet})$',
+    'gen_jet_tau20':r'$\mathrm{log}(\tau_{0}^\mathrm{jet})$',
 
     # 'gene_px':'e px',
     # 'gene_py':'e px',
@@ -99,6 +99,7 @@ for mc,tag in zip(mc_names,mc_tags):
             data[:,0,0][truth_mask[mc]==0] = -10
         else:
             data[:,0][truth_mask[mc]==0] = -10
+
         # print(np.average(predictions[mc]['gen_jet_ncharged'][:flags.N]/np.sum(data[:,:,2]>0,1)))
         # input()
         Q2 = np.ma.log(predictions[mc]['gen_Q2'][:flags.N]).filled(-1)

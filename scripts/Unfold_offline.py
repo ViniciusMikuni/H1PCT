@@ -33,7 +33,7 @@ parser.add_argument('--data_folder', default='/pscratch/sd/v/vmikuni/H1', help='
 
 parser.add_argument('--nvars', type=int, default=10, help='Number of distributions to unfold')
 parser.add_argument('--niter', type=int,default=5, help='Number of omnifold iterations')
-parser.add_argument('--nevts', type=int,default=30e6, help='Number of events to train per sample')
+parser.add_argument('--nevts', type=int,default=50e6, help='Number of events to train per sample')
 parser.add_argument('--ntrain', type=int,default=5, help='Number of independent trainings to perform')
 parser.add_argument('--reload', action='store_true', default=False,help='Redo the data preparation steps')
 parser.add_argument('--unfold', action='store_true', default=False,help='Train omnifold')
