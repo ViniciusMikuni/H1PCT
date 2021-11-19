@@ -8,7 +8,7 @@ import tensorflow.keras.backend as K
 from tensorflow.keras.layers import Dense, Input, Dropout
 from tensorflow.keras.models import Model
 from tensorflow.keras.utils import to_categorical
-from tensorflow.keras.callbacks import EarlyStopping,ModelCheckpoint,TensorBoard
+from tensorflow.keras.callbacks import EarlyStopping,ModelCheckpoint,TensorBoard,ReduceLROnPlateau
 from pct import PCT
 import time
 import horovod.tensorflow.keras as hvd
@@ -51,15 +51,20 @@ class Multifold():
         time_steps_2 = []
         for i in range(self.niter):
             self.iter = i
-            self.CompileModel(max(1e-4/(2**i),1e-7))
+            #self.CompileModel(max(1e-4/(2**i),1e-7))
+            self.CompileModel(1e-4)
+            
             if hvd.rank() ==0:
                 self.log_string("ITERATION: {}".format(i + 1))
                 start_time = time.time()
+                
             self.RunStep1(i)
+            
             if hvd.rank() ==0:
                 self.log_string("Total time Step 1: {}".format(time.time()-start_time))
                 time_steps_1.append(time.time()-start_time)
                 start_time = time.time()
+
             self.RunStep2(i)
             if hvd.rank() ==0:
                 self.log_string("Total time Step 2: {}".format(time.time()-start_time))
@@ -67,6 +72,7 @@ class Multifold():
         if hvd.rank() ==0:
             self.log_string("Average time spent on Step 1: {}".format(np.average(time_steps_1)))
             self.log_string("Average time spent on Step 2: {}".format(np.average(time_steps_2)))
+            
     def RunStep1(self,i):
         #Data versus reco MC reweighting
         print("RUNNING STEP 1")
@@ -147,6 +153,7 @@ class Multifold():
             hvd.callbacks.BroadcastGlobalVariablesCallback(0),
             hvd.callbacks.MetricAverageCallback(),
             hvd.callbacks.LearningRateWarmupCallback(initial_lr=self.hvd_lr, warmup_epochs=3, verbose=0),
+            ReduceLROnPlateau(patience=8, verbose=0),
             EarlyStopping(patience=10,restore_best_weights=True)
         ]
         
@@ -221,7 +228,7 @@ class Multifold():
             
     def PrepareModel(self):
         if self.pct:
-            inputs,input_q2,outputs = PCT(20,4)
+            inputs,input_q2,outputs = PCT(20,4,nheads=4)
             self.model = Model(inputs=[inputs,input_q2], outputs=outputs)
         else:          
             inputs = Input((self.nvars, ))
