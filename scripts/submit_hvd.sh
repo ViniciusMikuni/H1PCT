@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -C gpu
 #SBATCH -q early_science
-#SBATCH -n 64
+#SBATCH -n 128
 #SBATCH --ntasks-per-node 4
 #SBATCH --gpus-per-task 1
 #SBATCH -t 300
