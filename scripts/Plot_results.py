@@ -105,7 +105,7 @@ for mc,tag in zip(mc_names,mc_tags):
         Q2 = np.ma.log(predictions[mc]['gen_Q2'][:flags.N]).filled(-1)
         if flags.pct:            
             jet_pt = predictions[mc]['genjet_pt'][:flags.N]/100
-            #data[:,:,2]*=np.expand_dims(jet_pt,-1)
+            data[:,:,2]*=np.expand_dims(jet_pt,-1)
             data = [data,Q2]
             
         mfold = Multifold(

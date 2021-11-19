@@ -33,7 +33,7 @@ parser.add_argument('--data_folder', default='/pscratch/sd/v/vmikuni/H1', help='
 
 parser.add_argument('--nvars', type=int, default=10, help='Number of distributions to unfold')
 parser.add_argument('--niter', type=int,default=5, help='Number of omnifold iterations')
-parser.add_argument('--nevts', type=int,default=50e6, help='Number of events to train per sample')
+parser.add_argument('--nevts', type=float,default=50e6, help='Number of events to train per sample')
 parser.add_argument('--ntrain', type=int,default=5, help='Number of independent trainings to perform')
 parser.add_argument('--reload', action='store_true', default=False,help='Redo the data preparation steps')
 parser.add_argument('--unfold', action='store_true', default=False,help='Train omnifold')
@@ -86,7 +86,7 @@ for name,tag in zip(mc_names,mc_tags):
     if flags.pct:
         jet_pt = np.expand_dims(data['jet_pt'][hvd.rank():nevts:hvd.size()],-1)
         jet_pt = jet_pt[pass_reco==1]
-        #data_vars[:,:,2]*=jet_pt/100
+        data_vars[:,:,2]*=jet_pt/100
         
     mc_reco = np.concatenate([np.expand_dims(mc[var][hvd.rank():nevts:hvd.size()],-1) for var in var_names],-1)
     mc_gen = np.concatenate([np.expand_dims(mc[var][hvd.rank():nevts:hvd.size()],-1) for var in gen_names],-1)
@@ -97,8 +97,8 @@ for name,tag in zip(mc_names,mc_tags):
     if flags.pct:
         jet_pt = np.expand_dims(mc['jet_pt'][hvd.rank():nevts:hvd.size()],-1)
         gen_jet_pt = np.expand_dims(mc['genjet_pt'][hvd.rank():nevts:hvd.size()],-1)
-        # mc_reco[:,:,2] *=jet_pt/100
-        # mc_gen[:,:,2] *=gen_jet_pt/100
+        mc_reco[:,:,2] *=jet_pt/100
+        mc_gen[:,:,2] *=gen_jet_pt/100
         del jet_pt
         del gen_jet_pt
 
