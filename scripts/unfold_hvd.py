@@ -90,9 +90,9 @@ class Multifold():
         #Gen to Gen reweighing
         print("RUNNING STEP 2")
         #self.weights_push*
-        #weights = np.concatenate((self.weights_mc, self.weights_pull*self.weights_mc))
+        weights = np.concatenate((self.weights_mc, self.weights_pull*self.weights_mc))
         #weights = np.concatenate((self.weights_push, self.weights_pull))
-        weights = np.concatenate((np.ones(self.weights_mc.shape[0]), self.weights_pull))
+        #weights = np.concatenate((np.ones(self.weights_mc.shape[0]), self.weights_pull))
         self.RunModel(np.concatenate((self.mc_gen, self.mc_gen)),np.concatenate((self.labels_mc, self.labels_gen)),weights,np.concatenate((self.Q2['gen'], self.Q2['gen'])),i,stepn=2)
         
         if self.pct:
@@ -153,7 +153,7 @@ class Multifold():
             hvd.callbacks.BroadcastGlobalVariablesCallback(0),
             hvd.callbacks.MetricAverageCallback(),
             hvd.callbacks.LearningRateWarmupCallback(initial_lr=self.hvd_lr, warmup_epochs=3, verbose=0),
-            ReduceLROnPlateau(patience=8, verbose=0),
+            ReduceLROnPlateau(patience=5, verbose=0),
             EarlyStopping(patience=10,restore_best_weights=True)
         ]
         

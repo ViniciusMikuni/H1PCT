@@ -18,4 +18,4 @@ export MPICH_MAX_THREAD_SAFETY=multiple
 export MPIR_CVAR_GPU_EAGER_DEVICE_MEM=0
 
 cd $HOME/H1/scripts
-srun python Unfold_offline.py --closure --niter 50 --pct 
+srun python Unfold_offline.py --closure --niter 30 --pct 
