@@ -22,8 +22,10 @@ opt.SetStyle()
 
 parser = argparse.ArgumentParser()
 
+
 parser.add_argument('--data_folder', default='/clusterfs/ml4hep/vmikuni/H1/jet_subs/h5', help='Folder containing data and MC files')
 parser.add_argument('--weights', default='../weights', help='Folder to store trained weights')
+>>>>>>> main
 parser.add_argument('--closure', action='store_true', default=False,help='Plot closure results')
 parser.add_argument('--comp', action='store_true', default=False,help='Compare closure unc. from different methods')
 parser.add_argument('--pct', action='store_true', default=False,help='Load pct results')
@@ -83,7 +85,7 @@ class MCInfo():
 
     def LoadDataWeights(self,niter,pct=False):
         var_names = ['genjet_pt','genjet_eta','genjet_phi','gen_jet_ncharged','gen_Q2',
-             'gen_jet_charge', 'gen_jet_ptD','gen_jet_tau10', 'gen_jet_tau15', 'gen_jet_tau20']
+                     'gen_jet_charge', 'gen_jet_ptD','gen_jet_tau10', 'gen_jet_tau15', 'gen_jet_tau20']
 
         base_name = "Omnifold"
         if pct:
@@ -94,7 +96,6 @@ class MCInfo():
         data = np.concatenate([np.expand_dims(self.predictions[var][:self.N],-1) for var in var_names],-1)
 
         data[:,0][self.truth_mask==0] = -10
-                    
         mfold = Multifold(
             nvars=len(var_names),
             niter=1,
