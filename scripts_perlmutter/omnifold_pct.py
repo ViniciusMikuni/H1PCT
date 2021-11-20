@@ -27,7 +27,7 @@ def weighted_binary_crossentropy(y_true, y_pred):
 
 
 class Multifold():
-    def __init__(self,nvars, niter,Q2,pct=False,version = 'Closure',verbose=1):
+    def __init__(self,nvars, niter,Q2,pct=False,version = 'Closure',nhead = 1,verbose=1):
         # mc_gen, mc_reco, data,
         self.nvars = nvars
         self.niter=niter
@@ -38,6 +38,7 @@ class Multifold():
         self.pct = pct
         self.Q2=Q2
         self.timing_log = 'time_keeper_{}'.format(self.version)
+        self.nhead=nhead
         if self.pct:
             self.timing_log +='_PCT'
         self.timing_file = open('time_keeper/{}.txt'.format(self.timing_log),'w')
@@ -74,7 +75,7 @@ class Multifold():
             self.log_string("Average time spent on Step 2: {}".format(np.average(time_steps_2)))
             
     def RunStep1(self,i):
-        #Data versus reco MC reweighting
+        '''Data versus reco MC reweighting'''
         print("RUNNING STEP 1")
         weights = np.concatenate((self.weights_push*self.weights_mc,self.weights_data ))        
         self.RunModel(np.concatenate((self.mc_reco, self.data)),np.concatenate((self.labels_mc, self.labels_data)),weights,np.concatenate((self.Q2['reco'], self.Q2['data'])),i,stepn=1)
@@ -87,9 +88,9 @@ class Multifold():
         self.weights_pull = self.weights_push *new_weights
         self.weights_pull = self.weights_pull/np.average(self.weights_pull)
     def RunStep2(self,i):
-        #Gen to Gen reweighing
+        '''Gen to Gen reweighing'''
         print("RUNNING STEP 2")
-        #self.weights_push*
+
         weights = np.concatenate((self.weights_mc, self.weights_pull*self.weights_mc))
         #weights = np.concatenate((self.weights_push, self.weights_pull))
         #weights = np.concatenate((np.ones(self.weights_mc.shape[0]), self.weights_pull))
@@ -165,7 +166,7 @@ class Multifold():
                 base_name+='_PCT'
                 log_name+='_PCT'
                 
-            callbacks.append(ModelCheckpoint('../weights/{}_{}_iter{}_step{}.h5'.format(base_name,self.version,iteration,stepn),save_best_only=True,mode='auto',period=1,save_weights_only=True))
+            callbacks.append(ModelCheckpoint('../weights/{}_{}_perlmutter_iter{}_step{}.h5'.format(base_name,self.version,iteration,stepn),save_best_only=True,mode='auto',period=1,save_weights_only=True))
             #callbacks.append(TensorBoard(log_dir="logs/{}_{}_step{}".format(log_name,self.version,stepn)))
         
         hist =  self.model.fit(train_data,
@@ -228,7 +229,7 @@ class Multifold():
             
     def PrepareModel(self):
         if self.pct:
-            inputs,input_q2,outputs = PCT(20,4,nheads=4)
+            inputs,input_q2,outputs = PCT(20,4,nheads=self.nhead)
             self.model = Model(inputs=[inputs,input_q2], outputs=outputs)
         else:          
             inputs = Input((self.nvars, ))

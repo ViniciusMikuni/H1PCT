@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 import argparse
 import json
-from unfold_hvd import  Multifold
+from omnifold_pct import  Multifold
 import h5py as h5
 import os
 import horovod.tensorflow.keras as hvd
@@ -34,7 +34,7 @@ parser.add_argument('--data_folder', default='/pscratch/sd/v/vmikuni/H1', help='
 parser.add_argument('--nvars', type=int, default=10, help='Number of distributions to unfold')
 parser.add_argument('--niter', type=int,default=5, help='Number of omnifold iterations')
 parser.add_argument('--nevts', type=float,default=50e6, help='Number of events to train per sample')
-parser.add_argument('--ntrain', type=int,default=5, help='Number of independent trainings to perform')
+parser.add_argument('--nhead', type=int,default=5, help='Number of independent trainings to perform')
 parser.add_argument('--reload', action='store_true', default=False,help='Redo the data preparation steps')
 parser.add_argument('--unfold', action='store_true', default=False,help='Train omnifold')
 parser.add_argument('--closure', action='store_true', default=False,help='Train omnifold for a closure test using simulation')
@@ -125,6 +125,7 @@ for name,tag in zip(mc_names,mc_tags):
     mfold = Multifold(nvars=flags.nvars,
                       niter=flags.niter,
                       pct=flags.pct,
+                      nhead=flags.nhead,
                       Q2=Q2,
                       version = version
     )

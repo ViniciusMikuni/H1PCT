@@ -93,7 +93,7 @@ for mc,tag in zip(mc_names,mc_tags):
         if flags.pct:
             base_name+='_PCT'
             
-        model_name = '../weights/{}_{}_iter{}_step2.h5'.format(base_name,version,flags.niter)
+        model_name = '../weights/{}_{}_perlmutter_iter{}_step2.h5'.format(base_name,version,flags.niter)
         data = np.concatenate([np.expand_dims(predictions[mc][var][:flags.N],-1) for var in var_names],-1)
         if flags.pct:
             data[:,0,0][truth_mask[mc]==0] = -10
@@ -197,7 +197,7 @@ for var in gen_var_names:
     plt.ylim([-20,20])
     #plt.tight_layout()
     
-    plot_folder = '../plots_'+data_name if flags.closure==False else '../plots_closure'
+    plot_folder = '../plots_perlmutter_'+data_name if flags.closure==False else '../plots_closure_perlmutter'
     if flags.pct:
         plot_folder+='_pct'
     if not os.path.exists(plot_folder):

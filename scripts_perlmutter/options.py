@@ -1,4 +1,6 @@
 import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib import gridspec
 
 colors = {
     'LO':'b', 
@@ -10,6 +12,8 @@ colors = {
     'Rapgap':'darkorange',
     'Sherpa':'crimson',
     'Cascade':'b',
+    'PCT': 'g',
+    'MLP':'blueviolet',
 }
 
 
@@ -28,6 +32,9 @@ styles = {
 markers = {
     'Djangoh':'D',
     'Rapgap':'X',
+    
+    'PCT':'P',
+    'MLP':'o',
 }
 
 # dedicated_binning = {
@@ -104,3 +111,27 @@ def SetStyle():
     import mplhep as hep
     hep.set_style(hep.style.CMS)
     hep.style.use("CMS") 
+
+def SetGrid(ratio=True):
+    fig = plt.figure(figsize=(9, 9))
+    if ratio:
+        gs = gridspec.GridSpec(2, 1, height_ratios=[3,1]) 
+        gs.update(wspace=0.025, hspace=0.1)
+    else:
+        gs = gridspec.GridSpec(1, 1)
+    return fig,gs
+
+def FormatFig(xlabel,ylabel,ax0):
+    #Limit number of ddigits in ticks
+    # y_loc, _ = plt.yticks()
+    # y_update = ['%.1f' % y for y in y_loc]
+    # plt.yticks(y_loc, y_update) 
+    plt.xlabel(xlabel,fontsize=20)
+    plt.ylabel(ylabel)
+        
+
+    xposition = 0.8
+    plt.text(xposition, 0.92,'H1 Internal',
+             horizontalalignment='center',
+             verticalalignment='center',
+             transform = ax0.transAxes, fontsize=25, fontweight='bold')
