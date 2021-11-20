@@ -8,7 +8,7 @@ from dataloader import get_Dataframe, applyCut, applyCutsJets
 from unfold import  Multifold
 import h5py as h5
 import os
-os.environ['CUDA_VISIBLE_DEVICES']="3"
+os.environ['CUDA_VISIBLE_DEVICES']="2"
 
 import tensorflow as tf
 import tensorflow.keras.backend as K
@@ -24,12 +24,10 @@ parser.add_argument('--data_folder', default='/clusterfs/ml4hep/vmikuni/H1/jet_s
 
 parser.add_argument('--nvars', type=int, default=10, help='Number of distributions to unfold')
 parser.add_argument('--niter', type=int,default=5, help='Number of omnifold iterations')
-parser.add_argument('--ntrain', type=int,default=5, help='Number of independent trainings to perform')
-parser.add_argument('--nevts', type=int,default=10e6, help='Number of events to load')
+parser.add_argument('--nevts', type=float,default=10e6, help='Number of events to load')
 parser.add_argument('--reload', action='store_true', default=False,help='Redo the data preparation steps')
 parser.add_argument('--unfold', action='store_true', default=False,help='Train omnifold')
 parser.add_argument('--closure', action='store_true', default=False,help='Train omnifold for a closure test using simulation')
-parser.add_argument('--load_model', action='store_true', default=False,help='Load pretrained weights')
 parser.add_argument('--pct', action='store_true', default=False,help='Use PCT as the backbone model')
 
 flags = parser.parse_args()
@@ -39,11 +37,15 @@ mc_names = ['Rapgap']
 #mc_names = ['Django']
 mc_tags = ['nominal']
 
-var_names = ['jet_pt','jet_eta','jet_phi','jet_ncharged', 'Q2',
-             'jet_charge', 'jet_ptD','jet_tau10', 'jet_tau15', 'jet_tau20']
+var_names = [
+    'jet_pt','jet_eta','jet_phi',
+    'jet_ncharged', 'Q2', 'jet_charge', 'jet_ptD',
+    'jet_tau10', 'jet_tau15', 'jet_tau20']
 
-gen_names = ['genjet_pt','genjet_eta','genjet_phi','gen_jet_ncharged','gen_Q2',
-              'gen_jet_charge', 'gen_jet_ptD','gen_jet_tau10', 'gen_jet_tau15', 'gen_jet_tau20']
+gen_names = [
+    'genjet_pt','genjet_eta','genjet_phi',
+    'gen_jet_ncharged','gen_Q2','gen_jet_charge', 'gen_jet_ptD',
+    'gen_jet_tau10', 'gen_jet_tau15', 'gen_jet_tau20']
 
 if flags.pct:
     var_names = ['jet_part_eta','jet_part_phi','jet_part_pt','jet_part_charge']
@@ -67,13 +69,15 @@ if flags.reload:
     
     for name,tag in zip(mc_names,mc_tags):
         mc = get_Dataframe(flags.data_folder, name=name, tag=tag, pct=flags.pct,verbose=True)
+
         mc   = applyCutsJets(mc, isMC=True,verbose=True,pct=flags.pct)
         with h5.File(os.path.join('/clusterfs/ml4hep/vmikuni/H1/jet_subs/','h5',"{}_{}.h5".format(name,tag)),'w') as fh5:
             for key in mc:
-                print(key)
+                #print(key)
                 if 'part' in key:
                     feat = np.array([ entry for entry in mc[key].to_numpy()])
-                    feat = feat.reshape((len(feat),20)).astype(float)                    
+                    feat = feat.reshape((len(feat),20)).astype(float)
+
                     dset = fh5.create_dataset(key, data=feat)
                 else:
                     dset = fh5.create_dataset(key, data=mc[key].to_numpy(dtype=np.float32))
@@ -88,23 +92,32 @@ for name,tag in zip(mc_names,mc_tags):
     if mc_name == data_name:continue
     
     Q2 = {}
-    mc = h5.File(os.path.join(flags.data_folder,"{}.h5".format(mc_name)),'r')    
+    mc = h5.File(os.path.join(flags.data_folder,"{}.h5".format(mc_name)),'r')
+
 
     data = h5.File(os.path.join(flags.data_folder,"{}.h5".format(data_name)),'r')
-    data_vars = np.concatenate([np.expand_dims(data[var][:nevts],-1) for var in var_names],-1)    
-    Q2['data'] =  np.ma.log(data['Q2'][:nevts]).filled(-1)/2.0
+
+
 
     if flags.closure:
-        weights_data = data['wgt'][:nevts]
-        pass_reco = data['pass_reco'][:nevts] #pass reco selection
+        #nevts_data = int(1e6)
+        nevts_data = nevts
+
+        data_vars = np.concatenate([np.expand_dims(data[var][:nevts_data],-1) for var in var_names],-1)    
+        Q2['data'] =  np.ma.log(data['Q2'][:nevts_data]).filled(-1)
+        weights_data = data['wgt'][:nevts_data]
+        pass_reco = data['pass_reco'][:nevts_data] #pass reco selection
         weights_data = weights_data[pass_reco==1]
         data_vars = data_vars[pass_reco==1]
         Q2['data'] =Q2['data'][pass_reco==1]
         weights_data = weights_data/np.average(weights_data)
 
+    else:
+        data_vars = np.concatenate([np.expand_dims(data[var][:],-1) for var in var_names],-1)    
+        Q2['data'] =  np.ma.log(data['Q2'][:]).filled(-1)
 
     mc_reco = np.concatenate([np.expand_dims(mc[var][:nevts],-1) for var in var_names],-1)
-    Q2['reco'] = np.ma.log(mc['Q2'][:nevts]).filled(-1)/2.0
+    Q2['reco'] = np.ma.log(mc['Q2'][:nevts]).filled(-1)
     mc_gen = np.concatenate([np.expand_dims(mc[var][:nevts],-1) for var in gen_names],-1)
 
     weights_MC_sim = mc['wgt'][:nevts]
@@ -138,6 +151,7 @@ for name,tag in zip(mc_names,mc_tags):
     mfold.mc_gen = mc_gen
     mfold.mc_reco = mc_reco
     mfold.data = data_vars
+
     if flags.closure:
         mfold.Preprocessing(weights_mc=weights_MC_sim,weights_data=weights_data)
     else:

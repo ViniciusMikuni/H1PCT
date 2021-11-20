@@ -175,7 +175,7 @@ def PCT(npoints,nvars):
 
     batch_size = tf.shape(inputs)[0]
             
-    k = 5
+    k = 10
     mask = tf.where(inputs[:,:,2]==0,K.ones_like(inputs[:,:,2]),K.zeros_like(inputs[:,:,2]))
     adj,mask_matrix = pairwise_distanceR(inputs[:,:,:3],mask)    
     nn_idx = knn(adj, k=k)    
@@ -211,7 +211,7 @@ def PCT(npoints,nvars):
     net = tf.concat([net,input_q2],axis=-1)
     
     net = Dense(64,activation='relu')(net)
-    net = Dropout(0.5)(net)
+    net = Dropout(0.2)(net)
     outputs = Dense(1,activation='sigmoid')(net)
     
     return inputs,input_q2,outputs

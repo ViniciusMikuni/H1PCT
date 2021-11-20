@@ -68,8 +68,6 @@ gen_var_names = {
 }
 
 
-var_names = ['genjet_pt','genjet_eta','genjet_phi','gen_jet_ncharged','gen_Q2',
-             'gen_jet_charge', 'gen_jet_ptD','gen_jet_tau10', 'gen_jet_tau15', 'gen_jet_tau20']
     
     
 class MCInfo():
@@ -84,9 +82,13 @@ class MCInfo():
         
 
     def LoadDataWeights(self,niter,pct=False):
+        var_names = ['genjet_pt','genjet_eta','genjet_phi','gen_jet_ncharged','gen_Q2',
+             'gen_jet_charge', 'gen_jet_ptD','gen_jet_tau10', 'gen_jet_tau15', 'gen_jet_tau20']
+
         base_name = "Omnifold"
         if pct:
             base_name+='_PCT'            
+
         model_name = '{}/{}_{}_iter{}_step2.h5'.format(flags.weights,base_name,version,niter)
 
         data = np.concatenate([np.expand_dims(self.predictions[var][:self.N],-1) for var in var_names],-1)
@@ -117,6 +119,7 @@ weights_data = {}
 for mc,tag in zip(mc_names,mc_tags):
     print("{}_{}.h5".format(mc,tag))
     mc_info[mc] = MCInfo(mc,tag,flags.N,flags.data_folder)
+    
     
     if mc == data_name:
         weights_data['MLP'] = mc_info[mc].LoadDataWeights(flags.niter,pct=False)
@@ -152,6 +155,7 @@ for var in gen_var_names:
     for mc in mc_names:
         mask = mc_info[mc].fiducial_masks==1
         mc_var = mc_info[mc].predictions[var][:flags.N][mask]
+
         if 'tau' in var:
             mc_var = np.log(mc_var)    
         

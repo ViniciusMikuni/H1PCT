@@ -8,7 +8,7 @@ import tensorflow.keras.backend as K
 from tensorflow.keras.layers import Dense, Input, Dropout
 from tensorflow.keras.models import Model
 from tensorflow.keras.utils import to_categorical
-from tensorflow.keras.callbacks import EarlyStopping,ModelCheckpoint
+from tensorflow.keras.callbacks import EarlyStopping,ModelCheckpoint, ReduceLROnPlateau
 from pct import PCT
 
 def weighted_binary_crossentropy(y_true, y_pred):
@@ -45,7 +45,8 @@ class Multifold():
 
         for i in range(self.niter):
             self.iter = i
-            self.CompileModel(1e-4/(2**i))
+            #self.CompileModel(max(1e-4/(2**i),1e-6))
+            self.CompileModel(1e-4)
             print("ITERATION: {}".format(i + 1))
             self.RunStep1(i)
             self.RunStep2(i)
@@ -68,15 +69,16 @@ class Multifold():
         #Gen to Gen reweighing
         print("RUNNING STEP 2")
         #self.weights_push*
-        #weights = np.concatenate((self.weights_mc, self.weights_pull*self.weights_mc))
+        weights = np.concatenate((self.weights_mc, self.weights_pull*self.weights_mc))
         #weights = np.concatenate((self.weights_push, self.weights_pull))
-        weights = np.concatenate((np.ones(self.weights_mc.shape[0]), self.weights_pull))
+        #weights = np.concatenate((np.ones(self.weights_mc.shape[0]), self.weights_pull))
         self.RunModel(np.concatenate((self.mc_gen, self.mc_gen)),np.concatenate((self.labels_mc, self.labels_gen)),weights,i,self.model2,stepn=2)
         
         new_weights=self.reweight(self.mc_gen,self.model2)
         new_weights[self.not_pass_gen]=1.0
         #self.weights_push * 
-        self.weights_push = new_weights/np.average(new_weights)
+        self.weights_push = new_weights
+        self.weights_push = self.weights_push/np.average(self.weights_push)
 
     def RunModel(self,sample,labels,weights,iteration,model,stepn,Q2=None):
 
@@ -131,6 +133,7 @@ class Multifold():
 
         callbacks = [
             ModelCheckpoint('../weights/{}_{}_iter{}_step{}.h5'.format(base_name,self.version,iteration,stepn),save_best_only=True,mode='auto',period=1,save_weights_only=True),
+            #ReduceLROnPlateau(patience=5, verbose=0),
             EarlyStopping(patience=10,restore_best_weights=True)
         ]
 
@@ -166,18 +169,6 @@ class Multifold():
         else:
             self.weights_data =weights_data
 
-
-    def PrepareInputs(self):
-        self.labels_mc = np.zeros(len(self.mc_reco))
-        self.labels_data = np.ones(len(self.data))
-        self.labels_gen = np.ones(len(self.mc_gen))
-
-        if not self.pct:
-            scaler = StandardScaler()
-            scaler.fit(self.mc_gen[self.mc_gen[:,0]!=-10])
-            self.data[self.data[:,0]!=-10]=scaler.transform(self.data[self.data[:,0]!=-10])
-            self.mc_reco[self.mc_reco[:,0]!=-10]=scaler.transform(self.mc_reco[self.mc_reco[:,0]!=-10])
-            self.mc_gen[self.mc_gen[:,0]!=-10]=scaler.transform(self.mc_gen[self.mc_gen[:,0]!=-10])
 
     def CompileModel(self,lr):
         opt = tensorflow.keras.optimizers.Adam(learning_rate=lr)
@@ -231,8 +222,7 @@ class Multifold():
         
 
     def reweight(self,events,model):
-
-        f = np.nan_to_num(model.predict(events, batch_size=5000),posinf=0,neginf=0)
+        f = np.nan_to_num(model.predict(events, batch_size=5000),posinf=1,neginf=0)
         weights = f / (1. - f)
         weights = weights[:,0]
         return np.squeeze(np.nan_to_num(weights,posinf=1))
