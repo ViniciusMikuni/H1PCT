@@ -8,12 +8,13 @@ def get_Dataframe(path, name='Data', tag=None, pct = False,verbose=False):
     Files = os.listdir(path) 
     #print (Files)
     df = None
+    nprocessed = 0
     for i, f in enumerate(Files):
         if name not in f: continue
-        #if 'Eplus0607' not in f:continue
-        if 'Eplus0607_14' not in f:continue
+        if 'Eplus0607_1' not in f:continue
+        #if ('Eplus0607_101' not in f) :continue
         if not f.endswith(".root"): continue
-        
+        if nprocessed > 40: continue
         filename = os.path.join(path,f)
         if not(tag is None) and (tag not in f): continue
         if (verbose):
@@ -42,26 +43,29 @@ def get_Dataframe(path, name='Data', tag=None, pct = False,verbose=False):
             continue
 
         
-        temp_df = None
-        branches = ["jet_pt","jet_eta","jet_phi","Q2","y","e_*",'wgt','vertex_z','ptmiss','ptratio*','Empz','pth']    
-        if 'Data' not in name:
-            branches += ["gen*"]
-
-        branch_jet = [branch for branch in temp_tree.keys() if ('jet_' in str(branch) and 'part' not in str(branch) and 'gen' not in str(branch))]
-        branches += branch_jet
+        temp_df = None        
+        branches = [branch.decode('UTF-8') for branch in temp_tree.keys() if 'part' not in str(branch)]
         if verbose:print(branches)
+        if 'Data' in name:
+            branches = [branch for branch in branches if 'gen' not in branch]
 
 
-
-        # try:
-        temp_df   =  temp_tree.pandas.df(branches, entrystop=3e7,flatten=True)
+        #try:
+        temp_df   = temp_tree.pandas.df(branches, entrystop=3e7,flatten=True)
         if pct:            
-            parts = temp_tree.arrays(['jet_part*'])
-            parts = SplitJets(parts) #One entry per jet   
+            part_branches = [branch.decode('UTF-8') for branch in temp_tree.keys() if 'jet_part' in str(branch)]
+            if 'Data' in name:
+                part_branches = [branch for branch in part_branches if 'gen' not in branch]
+            parts = temp_tree.arrays(part_branches)
+            parts = SplitJets(parts,'Data' not in name) #One entry per jet
+            parts = OrderParts(parts,'Data' not in name)
+
             for ik, key in enumerate(parts.keys()):
                 temp_df[key] = parts[key].pad(20, clip=True).fillna(0).regular().tolist()
+
                 
         df = pd.concat([df,temp_df])
+        nprocessed+=1
         # except ValueError:
         #     if (verbose):
         #         print ('oops, there is a problem in flattening the TTree ')
@@ -162,33 +166,62 @@ def applyCutsJets(df,isMC=False,pct = False,verbose=False):
     #Save only the features we need.
     feature_list = [
         'e_px','e_py','e_pz',
-        'jet_pt','jet_phi','jet_eta',
+        'jet_pt','jet_phi','jet_eta','Q2',
         'jet_ncharged', 'jet_charge', 'jet_ptD','jet_tau10', 'jet_tau15', 'jet_tau20',
         'wgt','pass_reco']
     if (isMC):
         feature_list += [
             'gene_px','gene_py','gene_pz',
             'genjet_pt','genjet_phi','genjet_eta',
-            'gen_jet_ncharged', 'gen_jet_charge', 'gen_jet_ptD','gen_jet_tau10', 'gen_jet_tau15', 'gen_jet_tau20',            
+            'gen_jet_ncharged', 'gen_jet_charge', 'gen_jet_ptD',
+            'gen_jet_tau10', 'gen_jet_tau15', 'gen_jet_tau20',
+            'gen_Q2',
             'pass_truth', 'pass_fiducial']
+        if pct:
+            feature_list += ['gen_jet_part_pt','gen_jet_part_eta','gen_jet_part_phi','gen_jet_part_charge']
     if pct:
-        feature_list += [b'jet_part_pt',b'jet_part_eta',b'jet_part_phi',b'jet_part_charge']
+        feature_list += ['jet_part_pt','jet_part_eta','jet_part_phi','jet_part_charge']
 
     return temp[feature_list]
 
 
-def SplitJets(data_dict):
+def SplitJets(data_dict,isMC):
     new_dict = {}
     idx = data_dict[b'jet_part_idx']
     nparts = []
-    for entry in idx:
+    if isMC:
+        gen_idx = data_dict[b'gen_jet_part_idx']
+        nparts_gen = []
+
+    for ie,entry in enumerate(idx):
         ninvalid = np.sum(entry<0)
         entry[entry<0]=range(100,100+ninvalid)
         
         for unique in np.unique(entry):
             nparts.append(np.sum(unique==entry))
+
+        if isMC:
+            for unique in np.unique(gen_idx[ie]):
+                nparts_gen.append(np.sum(unique==gen_idx[ie]))
                 
             
     for key in data_dict:
-        new_dict[key] = awkward.JaggedArray.fromcounts(nparts,data_dict[key].flatten())
+        if 'gen' in key.decode('UTF-8'):
+            new_dict[key.decode('UTF-8')] = awkward.JaggedArray.fromcounts(nparts_gen,data_dict[key].flatten())
+        else:
+            new_dict[key.decode('UTF-8')] = awkward.JaggedArray.fromcounts(nparts,data_dict[key].flatten())
+            
     return new_dict
+
+def OrderParts(data_dict,isMC=False):
+    order = data_dict['jet_part_pt'].argsort()
+    if isMC:
+        order_gen = data_dict['gen_jet_part_pt'].argsort()
+    for key in data_dict:
+        if 'part' not in key: continue
+        if 'gen' in key:
+            data_dict[key]=data_dict[key][order_gen]
+        else:
+            data_dict[key]=data_dict[key][order]
+    return data_dict
+
