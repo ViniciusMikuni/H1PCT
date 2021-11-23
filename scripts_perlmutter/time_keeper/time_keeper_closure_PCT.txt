@@ -1,2 +1,0 @@
-ITERATION: 1
-Total time Step 1: 12.951916456222534
