@@ -3,19 +3,17 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
-from matplotlib.colors import LogNorm
-from sklearn.preprocessing import StandardScaler
 from matplotlib.font_manager import FontProperties
-from numpy import inf
 import argparse
 import os
-import tensorflow as tf
-import tensorflow.keras
-import tensorflow.keras.backend as K
-from pct import PCT
-import options as opt
+import sys
 import h5py as h5
 from omnifold_hybrid import  Multifold
+
+sys.path.append('../')
+
+from shared.pct import PCT
+import shared.options as opt
 
 
 opt.SetStyle()
@@ -29,7 +27,7 @@ parser.add_argument('--weights', default='../weights', help='Folder to store tra
 parser.add_argument('--closure', action='store_true', default=False,help='Plot closure results')
 parser.add_argument('--comp', action='store_true', default=False,help='Compare closure unc. from different methods')
 parser.add_argument('--pct', action='store_true', default=False,help='Load pct results')
-parser.add_argument('-N', type=int,default=20e6, help='Number of events to evaluate')
+parser.add_argument('-N', type=float,default=20e6, help='Number of events to evaluate')
 parser.add_argument('--niter', type=int, default=9, help='Omnifold iteration to load')
 
 flags = parser.parse_args()
@@ -84,8 +82,11 @@ class MCInfo():
         
 
     def LoadDataWeights(self,niter,pct=False):
-        var_names = ['genjet_pt','genjet_eta','genjet_phi','gen_jet_ncharged','gen_Q2',
-                     'gen_jet_charge', 'gen_jet_ptD','gen_jet_tau10', 'gen_jet_tau15', 'gen_jet_tau20']
+        var_names = [
+            'genjet_pt','genjet_eta','genjet_phi',
+            'gen_Q2', 'gene_px','gene_py','gene_pz',
+            'gen_jet_ncharged','gen_jet_charge',
+            'gen_jet_ptD','gen_jet_tau10', 'gen_jet_tau15', 'gen_jet_tau20']
 
         base_name = "Omnifold"
         if pct:
@@ -97,17 +98,15 @@ class MCInfo():
 
         data[:,0][self.truth_mask==0] = -10
         mfold = Multifold(
-            nvars=len(var_names),
             niter=1,
             pct=pct,
-            Q2=None,
+            global_vars=None,
         )
 
-        scaler = StandardScaler()
-        scaler.fit(data)
-        data=scaler.transform(data)
-
-
+        mean = np.mean(data[data[:,0]!=-10],0)
+        std = np.std(data[data[:,0]!=-10],0)
+        data[data[:,0]!=-10]=(data[data[:,0]!=-10]-mean)/std
+        
         mfold.mc_gen = data
         mfold.PrepareModel()
         mfold.model2.load_weights(model_name)
@@ -131,7 +130,7 @@ if flags.pct:
 else:
     weight_data = weights_data['MLP']
         
-
+print(weight_data)
 
 
 

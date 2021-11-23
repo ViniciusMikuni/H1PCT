@@ -1,7 +1,7 @@
 from __future__ import absolute_import, division, print_function
 import numpy as np
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+# from sklearn.model_selection import train_test_split
+# from sklearn.preprocessing import StandardScaler
 import tensorflow as tf
 import tensorflow.keras
 import tensorflow.keras.backend as K
@@ -9,8 +9,11 @@ from tensorflow.keras.layers import Dense, Input, Dropout
 from tensorflow.keras.models import Model
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import EarlyStopping,ModelCheckpoint, ReduceLROnPlateau
-from pct import PCT
+import sys
 import horovod.tensorflow.keras as hvd
+sys.path.append('../')
+from shared.pct import PCT
+
 
 def weighted_binary_crossentropy(y_true, y_pred):
     weights = tf.gather(y_true, [1], axis=1) # event weights
@@ -25,8 +28,8 @@ def weighted_binary_crossentropy(y_true, y_pred):
 
 
 class Multifold():
-    def __init__(self,nvars,niter,Q2,pct=False,version = 'Closure',nhead = 1,verbose=1):
-        self.nvars = nvars
+    def __init__(self,niter,global_vars,pct=False,version = 'Closure',nhead = 1,verbose=1):
+
         self.niter=niter
         self.mc_gen = None
         self.mc_reco = None
@@ -34,33 +37,62 @@ class Multifold():
         self.version = version
         self.pct = pct
         self.nhead=nhead
-        self.Q2 = Q2
-
+        self.global_vars = global_vars #Give global event information
 
 
     def Unfold(self):
-        self.BATCH_SIZE=5000
+        self.BATCH_SIZE=1024
         self.EPOCHS=1000
         self.weights_pull = np.ones(self.weights_mc.shape[0])
         self.weights_push = np.ones(self.weights_mc.shape[0])
 
-
+        #self.CompileModel(1e-6)
+        
+        min_distance=1e6
+        patience = 0
+        max_patience = 3
         for i in range(self.niter):
-            self.iter = i
-            #self.CompileModel(max(1e-4/(2**i),1e-6))
-            self.CompileModel(1e-4)
+            self.CompileModel(max(1e-6/(2**i),1e-8))
             print("ITERATION: {}".format(i + 1))
-            self.RunStep1(i)
+            
+            self.RunStep1(i)        
+            old_weights=self.weights_push
             self.RunStep2(i)
+            
+            if hvd.rank() == 0:
+                distance = np.mean(
+                    (np.sort(old_weights) - np.sort(self.weights_push))**2)
+                
+                print(80*'#')
+                print("Distance between weights: {}".format(distance))
+                print(80*'#')
+                
+                if distance<min_distance:
+                    min_distance = distance
+                    patience = 0
+                else:
+                    print(80*'#')
+                    print("Distance increased! before {} now {}".format(min_distance,distance))
+                    print(80*'#')
+                    patience+=1
+                    
+            if patience >= max_patience:
+                pass
+                break
 
     def RunStep1(self,i):
         '''Data versus reco MC reweighting'''
         print("RUNNING STEP 1")
         
         weights = np.concatenate((self.weights_push*self.weights_mc,self.weights_data ))
-        self.RunModel(np.concatenate((self.mc_reco, self.data)),np.concatenate((self.labels_mc, self.labels_data)),weights,i,self.model1,stepn=1,Q2=np.concatenate((self.Q2['reco'], self.Q2['data'])))
+        self.RunModel(
+            np.concatenate((self.mc_reco, self.data)),
+            np.concatenate((self.labels_mc, self.labels_data)),
+            weights,i,self.model1,stepn=1,
+            global_vars=np.concatenate((self.global_vars['reco'], self.global_vars['data'])))
+        
         if self.pct:
-            new_weights=self.reweight([self.mc_reco,self.Q2['reco']],self.model1)
+            new_weights=self.reweight([self.mc_reco,self.global_vars['reco']],self.model1)
         else:
             new_weights=self.reweight(self.mc_reco,self.model1)
         new_weights[self.not_pass_reco]=1.0
@@ -73,68 +105,54 @@ class Multifold():
         
         print("RUNNING STEP 2")
 
-        weights = np.concatenate((self.weights_mc, self.weights_pull*self.weights_mc))
-        #weights = np.concatenate((self.weights_push, self.weights_pull))
-        #weights = np.concatenate((np.ones(self.weights_mc.shape[0]), self.weights_pull))
-        self.RunModel(np.concatenate((self.mc_gen, self.mc_gen)),np.concatenate((self.labels_mc, self.labels_gen)),weights,i,self.model2,stepn=2)
+        weights = np.concatenate((np.ones(self.weights_mc.shape), self.weights_pull))
+        self.RunModel(
+            np.concatenate((self.mc_gen, self.mc_gen)),
+            np.concatenate((self.labels_mc, self.labels_gen)),
+            weights,i,self.model2,stepn=2)
         
         new_weights=self.reweight(self.mc_gen,self.model2)
         new_weights[self.not_pass_gen]=1.0
         
-        #self.weights_push * 
+        
         self.weights_push = new_weights
         self.weights_push = self.weights_push/np.average(self.weights_push)
 
-    def RunModel(self,sample,labels,weights,iteration,model,stepn,Q2=None):
-
-        if Q2 is not None:
-            X_train, X_test, Y_train, Y_test, w_train, w_test, q2_train, q2_test = train_test_split(sample, labels, weights,Q2)
-        else:
-            X_train, X_test, Y_train, Y_test, w_train, w_test = train_test_split(sample, labels, weights)       
-        
-        Y_train = np.stack((Y_train, w_train), axis=1)
-        Y_test = np.stack((Y_test, w_test), axis=1)
-
-        del sample
-        del labels
-        del weights
-
-
-        if self.pct and stepn==1: #Only reco is per particle
-            mask_train = X_train[:,0,0]!=-10
-            mask_test = X_test[:,0,0]!=-10
-
-            train_data = tf.data.Dataset.from_tensor_slices((
-                {'input_1':X_train[mask_train],
-                 'input_2':q2_train[mask_train]}, 
-                Y_train[mask_train])).batch(self.BATCH_SIZE)
+    def RunModel(self,sample,labels,weights,iteration,model,stepn,global_vars=None):
+        if self.pct and stepn==1: #Only reco is per particle            
+            mask = sample[:,0,0]!=-10
+            data = tf.data.Dataset.from_tensor_slices((
+                {'input_1':sample[mask],
+                 'input_2':global_vars[mask]}, 
+                np.stack((labels[mask],weights[mask]),axis=1))
+            ).shuffle(np.sum(mask))
             
-            test_data = tf.data.Dataset.from_tensor_slices((
-                {'input_1':X_test[mask_test],
-                 'input_2':q2_test[mask_test]},
-                Y_test[mask_test])).batch(self.BATCH_SIZE)
-
         else:
-            mask_train = X_train[:,0]!=-10
-            mask_test = X_test[:,0]!=-10
+            mask = sample[:,0]!=-10
+            data = tf.data.Dataset.from_tensor_slices((
+                sample[mask],
+                np.stack((labels[mask],weights[mask]),axis=1))
+            ).shuffle(np.sum(mask))
 
-            train_data = tf.data.Dataset.from_tensor_slices((X_train[mask_train], Y_train[mask_train])).batch(self.BATCH_SIZE)
-            test_data = tf.data.Dataset.from_tensor_slices((X_test[mask_test], Y_test[mask_test])).batch(self.BATCH_SIZE)
+        #about 20% acceptance
+        #Fix same number of training events between ranks
+        NTRAIN=int(0.2*0.8*labels.shape[0])
+        NTEST=int(0.2*0.2*labels.shape[0])
+        
+        test_data = data.take(NTEST).repeat().batch(self.BATCH_SIZE)
+        train_data = data.skip(NTEST).repeat().batch(self.BATCH_SIZE)
 
-        del X_train
-        del X_test
-        del Y_train
-        del Y_test
-        del w_train
-        del w_test
+
 
         verbose = 1 if hvd.rank() == 0 else 0
         
         callbacks = [
             hvd.callbacks.BroadcastGlobalVariablesCallback(0),
             hvd.callbacks.MetricAverageCallback(),
-            hvd.callbacks.LearningRateWarmupCallback(initial_lr=self.hvd_lr, warmup_epochs=3, verbose=0),
-            ReduceLROnPlateau(patience=5, verbose=0),            
+            hvd.callbacks.LearningRateWarmupCallback(
+                initial_lr=self.hvd_lr, warmup_epochs=5,
+                verbose=verbose),
+            #ReduceLROnPlateau(patience=5, verbose=verbose),
             EarlyStopping(patience=10,restore_best_weights=True)
         ]
         
@@ -145,11 +163,14 @@ class Multifold():
         if hvd.rank() ==0:    
             callbacks.append(ModelCheckpoint('../weights/{}_{}_iter{}_step{}.h5'.format(base_name,self.version,iteration,stepn),save_best_only=True,mode='auto',period=1,save_weights_only=True))
 
-        hist =  model.fit(train_data,
-                          epochs=self.EPOCHS,
-                          validation_data=test_data,
-                          verbose=verbose,
-                          callbacks=callbacks)
+        hist =  model.fit(
+            train_data,
+            epochs=self.EPOCHS,
+            steps_per_epoch=int(NTRAIN/self.BATCH_SIZE),
+            validation_data=test_data,
+            validation_steps=int(NTEST/self.BATCH_SIZE),
+            verbose=verbose,
+            callbacks=callbacks)
         return hist
 
 
@@ -182,7 +203,7 @@ class Multifold():
         self.hvd_lr = lr*hvd.size()
         opt = tensorflow.keras.optimizers.Adam(learning_rate=self.hvd_lr)
         opt = hvd.DistributedOptimizer(
-            opt, backward_passes_per_step=1, average_aggregated_gradients=True)
+            opt, average_aggregated_gradients=True)
 
         self.model1.compile(loss=weighted_binary_crossentropy,
                             optimizer=opt,experimental_run_tf_function=False)
@@ -197,32 +218,43 @@ class Multifold():
         self.labels_gen = np.ones(len(self.mc_gen))
 
         
-        scaler = StandardScaler()
-        scaler.fit(self.mc_gen[self.mc_gen[:,0]!=-10])
-
-        if not self.pct:
-            self.data[self.data[:,0]!=-10]=scaler.transform(self.data[self.data[:,0]!=-10])
-            self.mc_reco[self.mc_reco[:,0]!=-10]=scaler.transform(self.mc_reco[self.mc_reco[:,0]!=-10])        
-        self.mc_gen[self.mc_gen[:,0]!=-10]=scaler.transform(self.mc_gen[self.mc_gen[:,0]!=-10])
+        mean = np.mean(self.mc_gen[self.mc_gen[:,0]!=-10],0)
+        std = np.std(self.mc_gen[self.mc_gen[:,0]!=-10],0)
+        self.mc_gen[self.mc_gen[:,0]!=-10]=(self.mc_gen[self.mc_gen[:,0]!=-10]-mean)/std
         
-                
+        if not self.pct:
+            self.data[self.data[:,0]!=-10] = (self.data[self.data[:,0]!=-10]-mean)/std
+            self.mc_reco[self.mc_reco[:,0]!=-10]= (self.mc_reco[self.mc_reco[:,0]!=-10]-mean)/std
+        else:
+            mask_reco = self.global_vars['reco'][:,0]>0
+            mask_data = self.global_vars['data'][:,0]>0
+            mean = np.mean(self.global_vars['reco'][mask_reco],0)
+            std = np.std(self.global_vars['reco'][mask_reco],0)
+            self.global_vars['reco'][mask_reco] = (self.global_vars['reco'][mask_reco]-mean)/std
+            self.global_vars['data'][mask_data] = (self.global_vars['data'][mask_data]-mean)/std
+            
+        
 
     def PrepareModel(self):
+        nvars = self.mc_gen.shape[1]
         if self.pct:
-            inputs,input_q2,outputs = PCT(20,4,self.nhead)
-            self.model1 = Model(inputs=[inputs,input_q2], outputs=outputs)
+            self.nglobal = 7
+            inputs,input_global,outputs = PCT(20,4,self.nhead,self.nglobal)
+            self.model1 = Model(inputs=[inputs,input_global], outputs=outputs)
         else:          
-            inputs = Input((self.nvars, ))
+            inputs = Input((nvars, ))
             layer = Dense(50, activation='relu')(inputs)
             layer = Dense(100, activation='relu')(layer)
             layer = Dense(50, activation='relu')(layer)
+            layer = Dropout(0.2)(layer)
             outputs = Dense(1, activation='sigmoid')(layer)
             self.model1 = Model(inputs=inputs, outputs=outputs)
 
-        inputs2 = Input((self.nvars, ))
+        inputs2 = Input((nvars, ))
         layer = Dense(50, activation='relu')(inputs2)
         layer = Dense(100, activation='relu')(layer)
         layer = Dense(50, activation='relu')(layer)
+        layer = Dropout(0.2)(layer)
         outputs2 = Dense(1, activation='sigmoid')(layer)
 
 
@@ -233,7 +265,7 @@ class Multifold():
         
 
     def reweight(self,events,model):
-        f = np.nan_to_num(model.predict(events, batch_size=5000),posinf=1,neginf=0)
+        f = np.nan_to_num(model.predict(events, batch_size=10000),posinf=1,neginf=0)
         weights = f / (1. - f)
         weights = weights[:,0]
         return np.squeeze(np.nan_to_num(weights,posinf=1))

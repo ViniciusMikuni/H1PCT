@@ -12,11 +12,14 @@ import os
 import tensorflow as tf
 import tensorflow.keras
 import tensorflow.keras.backend as K
-from pct import PCT
-import options as opt
+
 import h5py as h5
 from unfold import  Multifold
 
+import sys
+sys.path.append('../')
+import shared.options as opt
+from shared.pct import PCT
 
 opt.SetStyle()
 
@@ -25,7 +28,6 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument('--data_folder', default='/clusterfs/ml4hep/vmikuni/H1/jet_subs/h5', help='Folder containing data and MC files')
 parser.add_argument('--weights', default='../weights', help='Folder to store trained weights')
->>>>>>> main
 parser.add_argument('--closure', action='store_true', default=False,help='Plot closure results')
 parser.add_argument('--comp', action='store_true', default=False,help='Compare closure unc. from different methods')
 parser.add_argument('--pct', action='store_true', default=False,help='Load pct results')

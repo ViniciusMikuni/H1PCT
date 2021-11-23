@@ -8,9 +8,13 @@ from matplotlib import gridspec
 from matplotlib.font_manager import FontProperties
 from numpy import inf
 import argparse
-import os
-import options as opt
 import h5py as h5
+import os
+
+import sys
+sys.path.append('../')
+import shared.options as opt
+
 
 
 opt.SetStyle()
