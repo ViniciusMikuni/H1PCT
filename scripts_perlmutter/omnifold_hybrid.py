@@ -1,7 +1,5 @@
 from __future__ import absolute_import, division, print_function
 import numpy as np
-# from sklearn.model_selection import train_test_split
-# from sklearn.preprocessing import StandardScaler
 import tensorflow as tf
 import tensorflow.keras
 import tensorflow.keras.backend as K
@@ -11,6 +9,7 @@ from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import EarlyStopping,ModelCheckpoint, ReduceLROnPlateau
 import sys
 import horovod.tensorflow.keras as hvd
+import horovod.tensorflow
 sys.path.append('../')
 from shared.pct import PCT
 
@@ -26,9 +25,18 @@ def weighted_binary_crossentropy(y_true, y_pred):
                          (1 - y_true) * K.log(1 - y_pred))
     return K.mean(t_loss)
 
+def label_smoothing(y_true,alpha=0):
+    new_label = y_true*(1-alpha) + (1-y_true)*alpha
+    return new_label
+
+def Scaler(file,var_list):
+    mean = [np.average(file[var],weights=file[var_list[0]][:]>0) for var in var_list]
+    variance = [np.average((file[var]-mean[iv])**2, weights=file[var_list[0]][:]>0) for iv, var in enumerate(var_list)]
+    return np.array(mean),np.sqrt(variance)
+
 
 class Multifold():
-    def __init__(self,niter,global_vars,pct=False,version = 'Closure',nhead = 1,verbose=1):
+    def __init__(self,niter,nevts,global_vars,nglobal=1,pct=False,version = 'Closure',nhead = 1,verbose=1):
 
         self.niter=niter
         self.mc_gen = None
@@ -36,23 +44,26 @@ class Multifold():
         self.data=None
         self.version = version
         self.pct = pct
-        self.nhead=nhead
+        self.nhead=nhead        
         self.global_vars = global_vars #Give global event information
-
+        self.nglobal = nglobal
+        self.nevts = nevts
+        self.verbose = verbose
+        self.log_file =  open('log_{}.txt'.format(self.version),'w')
 
     def Unfold(self):
-        self.BATCH_SIZE=1024
-        self.EPOCHS=1000
+        self.BATCH_SIZE=256
+        self.EPOCHS=100
         self.weights_pull = np.ones(self.weights_mc.shape[0])
         self.weights_push = np.ones(self.weights_mc.shape[0])
 
-        #self.CompileModel(1e-6)
+        self.CompileModel(1e-5)
         
         min_distance=1e6
         patience = 0
-        max_patience = 3
+        max_patience = 5
         for i in range(self.niter):
-            self.CompileModel(max(1e-6/(2**i),1e-8))
+            #self.CompileModel(max(1e-4/(2**i),1e-6))
             print("ITERATION: {}".format(i + 1))
             
             self.RunStep1(i)        
@@ -64,7 +75,7 @@ class Multifold():
                     (np.sort(old_weights) - np.sort(self.weights_push))**2)
                 
                 print(80*'#')
-                print("Distance between weights: {}".format(distance))
+                self.log_string("Distance between weights: {}".format(distance))
                 print(80*'#')
                 
                 if distance<min_distance:
@@ -76,9 +87,8 @@ class Multifold():
                     print(80*'#')
                     patience+=1
                     
-            if patience >= max_patience:
-                pass
-                break
+                    if patience >= max_patience:
+                        break
 
     def RunStep1(self,i):
         '''Data versus reco MC reweighting'''
@@ -98,7 +108,7 @@ class Multifold():
         new_weights[self.not_pass_reco]=1.0
 
         self.weights_pull = self.weights_push *new_weights
-        self.weights_pull = self.weights_pull/np.average(self.weights_pull)
+        #self.weights_pull = self.weights_pull/np.average(self.weights_pull)
 
     def RunStep2(self,i):
         '''Gen to Gen reweighing'''
@@ -106,6 +116,7 @@ class Multifold():
         print("RUNNING STEP 2")
 
         weights = np.concatenate((np.ones(self.weights_mc.shape), self.weights_pull))
+        #weights = np.concatenate((self.weights_mc, self.weights_mc*self.weights_pull))
         self.RunModel(
             np.concatenate((self.mc_gen, self.mc_gen)),
             np.concatenate((self.labels_mc, self.labels_gen)),
@@ -129,20 +140,29 @@ class Multifold():
             
         else:
             mask = sample[:,0]!=-10
+            if self.verbose: print("SHUFFLE BUFFER",np.sum(mask))
             data = tf.data.Dataset.from_tensor_slices((
                 sample[mask],
                 np.stack((labels[mask],weights[mask]),axis=1))
             ).shuffle(np.sum(mask))
 
-        #about 20% acceptance
+
         #Fix same number of training events between ranks
-        NTRAIN=int(0.2*0.8*labels.shape[0])
-        NTEST=int(0.2*0.2*labels.shape[0])
+        if stepn ==1:
+            #about 20% acceptance for reco events
+            NTRAIN=int(0.2*0.8*self.nevts/hvd.size())
+            NTEST=int(0.2*0.2*self.nevts/hvd.size())                        
+        else:
+            NTRAIN=int(0.8*self.nevts/hvd.size())
+            NTEST=int(0.2*self.nevts/hvd.size())                        
         
         test_data = data.take(NTEST).repeat().batch(self.BATCH_SIZE)
         train_data = data.skip(NTEST).repeat().batch(self.BATCH_SIZE)
 
-
+        if self.verbose:
+            print(80*'#')
+            print("Train events used: {}, total number of train events: {}, percentage: {}".format(NTRAIN,np.sum(mask)*0.8, np.sum(mask)*0.8/NTRAIN))
+            print(80*'#')
 
         verbose = 1 if hvd.rank() == 0 else 0
         
@@ -152,8 +172,8 @@ class Multifold():
             hvd.callbacks.LearningRateWarmupCallback(
                 initial_lr=self.hvd_lr, warmup_epochs=5,
                 verbose=verbose),
-            #ReduceLROnPlateau(patience=5, verbose=verbose),
-            EarlyStopping(patience=10,restore_best_weights=True)
+            ReduceLROnPlateau(patience=3, min_lr=1e-7,verbose=verbose),
+            EarlyStopping(patience=5,restore_best_weights=True)
         ]
         
         base_name = "Omnifold"
@@ -200,6 +220,7 @@ class Multifold():
 
 
     def CompileModel(self,lr):
+        #self.hvd_lr = lr*np.sqrt(hvd.size())
         self.hvd_lr = lr*hvd.size()
         opt = tensorflow.keras.optimizers.Adam(learning_rate=self.hvd_lr)
         opt = hvd.DistributedOptimizer(
@@ -216,49 +237,30 @@ class Multifold():
         self.labels_mc = np.zeros(len(self.mc_reco))        
         self.labels_data = np.ones(len(self.data))
         self.labels_gen = np.ones(len(self.mc_gen))
-
-        
-        mean = np.mean(self.mc_gen[self.mc_gen[:,0]!=-10],0)
-        std = np.std(self.mc_gen[self.mc_gen[:,0]!=-10],0)
-        self.mc_gen[self.mc_gen[:,0]!=-10]=(self.mc_gen[self.mc_gen[:,0]!=-10]-mean)/std
-        
-        if not self.pct:
-            self.data[self.data[:,0]!=-10] = (self.data[self.data[:,0]!=-10]-mean)/std
-            self.mc_reco[self.mc_reco[:,0]!=-10]= (self.mc_reco[self.mc_reco[:,0]!=-10]-mean)/std
-        else:
-            mask_reco = self.global_vars['reco'][:,0]>0
-            mask_data = self.global_vars['data'][:,0]>0
-            mean = np.mean(self.global_vars['reco'][mask_reco],0)
-            std = np.std(self.global_vars['reco'][mask_reco],0)
-            self.global_vars['reco'][mask_reco] = (self.global_vars['reco'][mask_reco]-mean)/std
-            self.global_vars['data'][mask_data] = (self.global_vars['data'][mask_data]-mean)/std
-            
-        
+                          
 
     def PrepareModel(self):
         nvars = self.mc_gen.shape[1]
         if self.pct:
-            self.nglobal = 7
-            inputs,input_global,outputs = PCT(20,4,self.nhead,self.nglobal)
+            inputs,input_global,outputs = PCT(30,4,self.nhead,self.nglobal)
             self.model1 = Model(inputs=[inputs,input_global], outputs=outputs)
         else:          
             inputs = Input((nvars, ))
             layer = Dense(50, activation='relu')(inputs)
             layer = Dense(100, activation='relu')(layer)
+            #layer = Dropout(0.5)(layer)
             layer = Dense(50, activation='relu')(layer)
-            layer = Dropout(0.2)(layer)
+            #layer = Dropout(0.5)(layer)
             outputs = Dense(1, activation='sigmoid')(layer)
             self.model1 = Model(inputs=inputs, outputs=outputs)
 
         inputs2 = Input((nvars, ))
         layer = Dense(50, activation='relu')(inputs2)
         layer = Dense(100, activation='relu')(layer)
+        #layer = Dropout(0.5)(layer)
         layer = Dense(50, activation='relu')(layer)
-        layer = Dropout(0.2)(layer)
+        #layer = Dropout(0.5)(layer)
         outputs2 = Dense(1, activation='sigmoid')(layer)
-
-
-
         self.model2 = Model(inputs=inputs2, outputs=outputs2)          
 
                 
@@ -271,3 +273,7 @@ class Multifold():
         return np.squeeze(np.nan_to_num(weights,posinf=1))
 
         
+    def log_string(self,out_str):
+        self.log_file.write(out_str+'\n')
+        self.log_file.flush()
+        print(out_str)

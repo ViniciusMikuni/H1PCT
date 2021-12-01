@@ -27,7 +27,7 @@ def weighted_binary_crossentropy(y_true, y_pred):
 
 
 class Multifold():
-    def __init__(self,niter,global_vars,pct=False,version = 'Closure',nhead = 1,verbose=1):
+    def __init__(self,niter,global_vars,nglobal,nevts,pct=False,version = 'Closure',nhead = 1,verbose=1):
         # mc_gen, mc_reco, data,
         self.niter=niter
         self.mc_gen = None
@@ -36,21 +36,24 @@ class Multifold():
         self.version = version
         self.pct = pct
         self.global_vars=global_vars
+        self.nglobal = nglobal
         self.timing_log = 'time_keeper_{}'.format(self.version)
         self.nhead=nhead
+        self.nevts = nevts
+        
         if self.pct:
             self.timing_log +='_PCT'
         self.timing_file = open('time_keeper/{}.txt'.format(self.timing_log),'w')
 
     def Unfold(self):
-        self.BATCH_SIZE=2048
-        self.EPOCHS=1000
+        self.BATCH_SIZE=128
+        self.EPOCHS=10
         self.weights_pull = np.ones(self.weights_mc.shape[0])
         self.weights_push = np.ones(self.weights_mc.shape[0])
         time_steps_1 = []
         time_steps_2 = []
         
-        self.CompileModel(1e-6)
+        self.CompileModel(1e-5)
         min_distance=1e6
         
         for i in range(self.niter):
@@ -98,13 +101,13 @@ class Multifold():
         self.RunModel(
             np.concatenate((self.mc_reco, self.data)),
             np.concatenate((self.labels_mc, self.labels_data)),
-            weights,
-            np.concatenate((self.Q2['reco'], self.Q2['data'])),i,stepn=1)
-
+            weights,i,stepn=1,
+            global_vars=np.concatenate((self.global_vars['reco'], self.global_vars['data'])))
         if self.pct:
-            new_weights=self.reweight([self.mc_reco,self.Q2['reco']])
+            new_weights=self.reweight([self.mc_reco,self.global_vars['reco']])
         else:
             new_weights=self.reweight(self.mc_reco)
+            
         new_weights[self.not_pass_reco]=1.0
         self.weights_pull = self.weights_push *new_weights
         self.weights_pull = self.weights_pull/np.average(self.weights_pull)
@@ -116,11 +119,11 @@ class Multifold():
         self.RunModel(
             np.concatenate((self.mc_gen, self.mc_gen)),
             np.concatenate((self.labels_mc, self.labels_gen)),
-            weights,
-            np.concatenate((self.Q2['gen'], self.Q2['gen'])),i,stepn=2)
+            weights,i,stepn=2,
+            global_vars=np.concatenate((self.global_vars['gen'], self.global_vars['gen'])))
         
         if self.pct:
-            new_weights=self.reweight([self.mc_gen,self.Q2['gen']])
+            new_weights=self.reweight([self.mc_gen,self.global_vars['gen']])
         else:
             new_weights=self.reweight(self.mc_gen)
         new_weights[self.not_pass_gen]=1.0
@@ -128,37 +131,43 @@ class Multifold():
         self.weights_push = new_weights
         self.weights_push = self.weights_push/np.average(self.weights_push)
         
-    def RunModel(self,sample,labels,weights,Q2,iteration,stepn):
+    def RunModel(self,sample,labels,weights,iteration,stepn,global_vars):
 
         if self.pct: #Only reco is per particle
             mask = sample[:,0,0]!=-10
             data = tf.data.Dataset.from_tensor_slices((
                 {'input_1':sample[mask],
-                 'input_2':Q2[mask]}, 
+                 'input_2':global_vars[mask]}, 
                 np.stack((labels[mask],weights[mask]),axis=1))
-            ).shuffle(labels.shape[0])
+            ).shuffle(labels.shape[0]).repeat()
             
         else:
             mask = sample[:,0]!=-10
             data = tf.data.Dataset.from_tensor_slices((
                 sample[mask],
                 np.stack((labels[mask],weights[mask]),axis=1))
-            ).shuffle(labels.shape[0])
+            ).shuffle(labels.shape[0]).repeat()
 
         
-        NSAMPLES_TRAIN = int(0.8*0.2*labels.shape[0]) #about 20% acceptance
-        NSAMPLES_TEST = int(0.2*0.2*labels.shape[0])
+        #Fix same number of training events between ranks
+        if stepn ==1:
+            #about 20% acceptance for reco events
+            NTRAIN=int(0.2*0.8*self.nevts/hvd.size())
+            NTEST=int(0.2*0.2*self.nevts/hvd.size())                        
+        else:
+            NTRAIN=int(0.8*self.nevts/hvd.size())
+            NTEST=int(0.2*self.nevts/hvd.size())                        
         
-        train_data = data.skip(NSAMPLES_TEST).repeat().batch(self.BATCH_SIZE)
-        test_data = data.take(NSAMPLES_TEST).repeat().batch(self.BATCH_SIZE)
-
+        test_data = data.take(NTEST).batch(self.BATCH_SIZE)
+        train_data = data.skip(NTEST).batch(self.BATCH_SIZE)
         
         verbose = 1 if hvd.rank() == 0 else 0
 
         callbacks=[
             hvd.callbacks.BroadcastGlobalVariablesCallback(0),
             hvd.callbacks.MetricAverageCallback(),
-            hvd.callbacks.LearningRateWarmupCallback(initial_lr=self.hvd_lr, warmup_epochs=5, verbose=verbose),
+            hvd.callbacks.LearningRateWarmupCallback(
+                initial_lr=self.hvd_lr, warmup_epochs=5, verbose=verbose),
             #ReduceLROnPlateau(patience=5, verbose=verbose),
             EarlyStopping(patience=10,restore_best_weights=True)
         ]
@@ -177,9 +186,9 @@ class Multifold():
         hist =  self.model.fit(
             train_data,
             epochs=self.EPOCHS,
-            steps_per_epoch=int(NSAMPLES_TRAIN/self.BATCH_SIZE),
+            steps_per_epoch=int(NTRAIN/self.BATCH_SIZE),
             validation_data=test_data,
-            validation_steps=int(NSAMPLES_TEST/self.BATCH_SIZE),
+            validation_steps=int(NTEST/self.BATCH_SIZE),
             callbacks=callbacks,
             verbose=verbose
         )
@@ -235,11 +244,11 @@ class Multifold():
             
 
     def CompileModel(self,lr):
-        self.hvd_lr = lr*hvd.size()
+        self.hvd_lr = lr*np.sqrt(hvd.size())
         opt = tensorflow.keras.optimizers.Adam(learning_rate=self.hvd_lr)
         opt = hvd.DistributedOptimizer(
-            opt, average_aggregated_gradients=True)
-        
+            opt)
+        #average_aggregated_gradients=True
         self.model.compile(loss=weighted_binary_crossentropy,
                            optimizer=opt,
                            experimental_run_tf_function=False
@@ -248,14 +257,16 @@ class Multifold():
             
     def PrepareModel(self):
         if self.pct:
-            inputs,input_q2,outputs = PCT(20,4,nheads=self.nhead)
-            self.model = Model(inputs=[inputs,input_q2], outputs=outputs)
+            inputs,input_global,outputs = PCT(20,4,nheads=self.nhead,nglobal=self.nglobal,)
+            self.model = Model(inputs=[inputs,input_global], outputs=outputs)
         else:
             nvars = self.mc_gen.shape[1]
             inputs = Input((nvars, ))
             layer = Dense(50, activation='relu')(inputs)
             layer = Dense(100, activation='relu')(layer)
+            layer = Dropout(0.5)(layer)
             layer = Dense(50, activation='relu')(layer)
+            layer = Dropout(0.5)(layer)
             outputs = Dense(1, activation='sigmoid')(layer)
             self.model = Model(inputs=inputs, outputs=outputs)
         

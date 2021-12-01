@@ -122,7 +122,9 @@ for name,tag in zip(mc_names,mc_tags):
         pct=flags.pct,
         nhead=flags.nhead,
         global_vars=global_vars,
-        version = version
+        version = version,
+        nglobal = len(global_names_reco),
+        nevts=2*nevts if flags.closure else nevts, #data size smaller than simulation
     )
     
     mfold.mc_gen = mc_gen

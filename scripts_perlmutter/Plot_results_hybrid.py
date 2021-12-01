@@ -8,7 +8,7 @@ import argparse
 import os
 import sys
 import h5py as h5
-from omnifold_hybrid import  Multifold
+from omnifold_hybrid import  Multifold, Scaler
 
 sys.path.append('../')
 
@@ -27,7 +27,7 @@ parser.add_argument('--weights', default='../weights', help='Folder to store tra
 parser.add_argument('--closure', action='store_true', default=False,help='Plot closure results')
 parser.add_argument('--comp', action='store_true', default=False,help='Compare closure unc. from different methods')
 parser.add_argument('--pct', action='store_true', default=False,help='Load pct results')
-parser.add_argument('-N', type=float,default=20e6, help='Number of events to evaluate')
+parser.add_argument('-N', type=float,default=50e6, help='Number of events to evaluate')
 parser.add_argument('--niter', type=int, default=9, help='Omnifold iteration to load')
 
 flags = parser.parse_args()
@@ -49,6 +49,8 @@ else:
 
 
 gen_var_names = {
+    #'jet_pt': r"$p_\mathrm{T}^\mathrm{jet}$",
+    
     'gen_Q2': r"$Q^2$",
     'genjet_pt': r"$p_\mathrm{T}^\mathrm{jet}$",
     'genjet_eta':r'$\eta^\mathrm{jet}$',
@@ -75,18 +77,20 @@ class MCInfo():
         self.mc = mc
         self.tag = tag
         self.N = N
-        self.predictions = h5.File(os.path.join(data_folder,"{}_{}.h5".format(mc,tag)),'r')
-        self.nominal_wgts = self.predictions['wgt'][:self.N]
-        self.fiducial_masks = self.predictions['pass_fiducial'][:self.N] #pass fiducial region definition
-        self.truth_mask = self.predictions['pass_truth'][:self.N] #pass truth region definition
+        self.file = h5.File(os.path.join(data_folder,"{}_{}.h5".format(mc,tag)),'r')
+        self.nominal_wgts = self.file['wgt'][:self.N]
+        self.fiducial_masks = self.file['pass_fiducial'][:self.N] #pass fiducial region definition
+        #self.fiducial_masks *= np.sum(self.file['gen_jet_part_pt'][:self.N] > 0,-1) < 20
+        self.truth_mask = self.file['pass_truth'][:self.N] #pass truth region definition
         
 
     def LoadDataWeights(self,niter,pct=False):
         var_names = [
             'genjet_pt','genjet_eta','genjet_phi',
-            'gen_Q2', 'gene_px','gene_py','gene_pz',
-            'gen_jet_ncharged','gen_jet_charge',
-            'gen_jet_ptD','gen_jet_tau10', 'gen_jet_tau15', 'gen_jet_tau20']
+            'gen_Q2',
+            #'gene_px','gene_py','gene_pz',
+            'gen_jet_ncharged','gen_jet_charge','gen_jet_ptD',
+            'gen_jet_tau10', 'gen_jet_tau15', 'gen_jet_tau20']
 
         base_name = "Omnifold"
         if pct:
@@ -94,19 +98,20 @@ class MCInfo():
 
         model_name = '{}/{}_{}_iter{}_step2.h5'.format(flags.weights,base_name,version,niter)
 
-        data = np.concatenate([np.expand_dims(self.predictions[var][:self.N],-1) for var in var_names],-1)
+        data = np.concatenate([np.expand_dims(self.file[var][:self.N],-1) for var in var_names],-1)
 
         data[:,0][self.truth_mask==0] = -10
         mfold = Multifold(
             niter=1,
             pct=pct,
             global_vars=None,
+            nglobal = 7,
+            nevts = self.N
         )
 
-        mean = np.mean(data[data[:,0]!=-10],0)
-        std = np.std(data[data[:,0]!=-10],0)
+
+        mean,std = Scaler(self.file,var_names)        
         data[data[:,0]!=-10]=(data[data[:,0]!=-10]-mean)/std
-        
         mfold.mc_gen = data
         mfold.PrepareModel()
         mfold.model2.load_weights(model_name)
@@ -139,10 +144,9 @@ for var in gen_var_names:
     binning = opt.dedicated_binning[var]    
     mask = mc_info[data_name].fiducial_masks==1
 
-    data_var = mc_info[data_name].predictions[var][:flags.N][mask]
+    data_var = mc_info[data_name].file[var][:flags.N][mask]
     if 'tau' in var:
-        data_var = np.log(data_var)    
-
+        data_var = np.log(data_var)
     fig,gs = opt.SetGrid() 
     ax0 = plt.subplot(gs[0])
     
@@ -154,7 +158,7 @@ for var in gen_var_names:
     ratios = {}
     for mc in mc_names:
         mask = mc_info[mc].fiducial_masks==1
-        mc_var = mc_info[mc].predictions[var][:flags.N][mask]
+        mc_var = mc_info[mc].file[var][:flags.N][mask]
 
         if 'tau' in var:
             mc_var = np.log(mc_var)    
@@ -193,19 +197,18 @@ for var in gen_var_names:
         fig,gs = opt.SetGrid() 
         ax0 = plt.subplot(gs[0])
         
-
-        mc_var = mc_info[mc_ref].predictions[var][:flags.N][mask]
+        mask = mc_info[mc_ref].fiducial_masks==1        
+        mc_var = mc_info[mc_ref].file[var][:flags.N][mask]
         if 'tau' in var:
             mc_var = np.log(mc_var)    
 
-        mask = mc_info[mc_ref].fiducial_masks==1
         mc_pred,_,_=ax0.hist(mc_var,weights=mc_info[mc_ref].nominal_wgts[mask],bins=binning,label="Target Gen",density=True,color="black",histtype="step")
 
         opt.FormatFig(xlabel = "", ylabel = r'$1/\sigma$ $\mathrm{d}\sigma/\mathrm{d}$%s'%gen_var_names[var],ax0=ax0)
 
         ratios = {}        
         mask = mc_info[data_name].fiducial_masks==1
-        data_var = mc_info[data_name].predictions[var][:flags.N][mask]
+        data_var = mc_info[data_name].file[var][:flags.N][mask]
         if 'tau' in var:
             data_var = np.log(data_var)    
         for train in weights_data:
@@ -215,6 +218,9 @@ for var in gen_var_names:
 
         ax0.legend(loc='lower right',fontsize=16,ncol=1)
         plt.xticks(fontsize=0)
+        if 'genjet_pt' in var or 'Q2' in var:
+            plt.xscale('log')
+            plt.yscale('log')
 
 
         ax1 = plt.subplot(gs[1],sharex=ax0)
@@ -227,13 +233,15 @@ for var in gen_var_names:
         plt.axhline(y=0.0, color='r', linestyle='-')
         plt.axhline(y=10, color='r', linestyle='--')
         plt.axhline(y=-10, color='r', linestyle='--')
+        if 'genjet_pt' in var or 'Q2' in var:
+            plt.xscale('log')
 
         plt.ylim([-20,20])
     
         plot_folder = '../plots_comp'
         if not os.path.exists(plot_folder):
             os.makedirs(plot_folder)
-        fig.savefig(os.path.join(plot_folder,"{}.pdf".format(var)))
+        fig.savefig(os.path.join(plot_folder,"{}_{}.pdf".format(var,flags.niter)))
 
 
 
