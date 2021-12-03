@@ -12,8 +12,10 @@ colors = {
     'Rapgap':'darkorange',
     'Sherpa':'crimson',
     'Cascade':'b',
-    'PCT': 'g',
-    'MLP':'blueviolet',
+    
+    'PCT': 'g',    
+    'standard':'blueviolet',
+    'hybrid':'b',
 }
 
 
@@ -34,7 +36,8 @@ markers = {
     'Rapgap':'X',
     
     'PCT':'P',
-    'MLP':'o',
+    'standard':'o',
+    'hybrid':'x',
 }
 
 # dedicated_binning = {
@@ -127,8 +130,8 @@ def FormatFig(xlabel,ylabel,ax0):
     # y_loc, _ = plt.yticks()
     # y_update = ['%.1f' % y for y in y_loc]
     # plt.yticks(y_loc, y_update) 
-    plt.xlabel(xlabel,fontsize=20)
-    plt.ylabel(ylabel)
+    ax0.set_xlabel(xlabel,fontsize=20)
+    ax0.set_ylabel(ylabel)
         
 
     xposition = 0.8

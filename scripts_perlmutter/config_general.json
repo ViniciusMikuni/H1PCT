@@ -1,0 +1,9 @@
+{
+    'MC_NAMES':['Rapgap_nominal','Djangoh_nominal'],
+    'VAR_MLP': ['jet_pt','jet_eta','jet_phi','Q2','jet_ncharged',  'jet_charge', 'jet_ptD','jet_tau10', 'jet_tau15', 'jet_tau20'],
+    'VAR_MLP_GEN': ['genjet_pt','genjet_eta','genjet_phi','gen_Q2','gen_jet_ncharged','gen_jet_charge', 'gen_jet_ptD','gen_jet_tau10', 'gen_jet_tau15', 'gen_jet_tau20'],
+    'VAR_PCT':['jet_part_eta','jet_part_phi','jet_part_pt','jet_part_charge'],
+    'VAR_PCT_GEN':['gen_jet_part_eta','gen_jet_part_phi','gen_jet_part_pt','gen_jet_part_charge'],
+    'GLOBAL_RECO':['Q2','jet_pt','jet_eta','jet_phi'],
+    'GLOBAL_GEN':['gen_Q2','genjet_pt','genjet_eta','genjet_phi']
+}

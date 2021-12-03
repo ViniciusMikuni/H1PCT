@@ -51,7 +51,7 @@ test = {
     'y':h5.File(os.path.join(flags.folder, 'test_ttbar.h5'),'r')['pid'][:]
 }
 
-train_data = tf.data.Dataset.from_tensor_slices((train['X'],train['y'])).shuffle(train['X'].shape[0]).shard(hvd.size(), hvd.rank()).repeat().batch(flags.batch)
+train_data = tf.data.Dataset.from_tensor_slices((train['X'],train['y'])).shuffle(train['X'].shape[0]).shard(hvd.size(), hvd.rank()).batch(flags.batch)
 test_data = tf.data.Dataset.from_tensor_slices((test['X'],test['y'])).batch(flags.batch)
 
 
@@ -61,13 +61,13 @@ callbacks=[
     hvd.callbacks.BroadcastGlobalVariablesCallback(0),
     hvd.callbacks.MetricAverageCallback(),
     hvd.callbacks.LearningRateWarmupCallback(initial_lr=1e-4*hvd.size(), warmup_epochs=3, verbose=0),
-    EarlyStopping(patience=20,restore_best_weights=True),
-    ReduceLROnPlateau(patience=5, verbose=1),
+    EarlyStopping(patience=10,restore_best_weights=True),
+    ReduceLROnPlateau(patience=3, verbose=1),
     #tf.keras.callbacks.LearningRateScheduler(scheduler, verbose=0)
 ]
 
 
-opt = tf.keras.optimizers.Adam(1e-4*hvd.size())
+opt = tf.keras.optimizers.Adam(1e-5*np.sqrt(hvd.size()))
 opt = hvd.DistributedOptimizer(
     opt, backward_passes_per_step=1, average_aggregated_gradients=True)
 
@@ -81,7 +81,7 @@ model.compile(loss='binary_crossentropy',
 verbose = 1 if hvd.rank() == 0 else 0
 hist =  model.fit(train_data,
                   epochs=100,
-                  steps_per_epoch=int(train['X'].shape[0]/(1.0*flags.batch*hvd.size())),
+                  #steps_per_epoch=int(train['X'].shape[0]/(1.0*flags.batch*hvd.size())),
                   validation_data=test_data,
                   callbacks=callbacks,
                   verbose=verbose,

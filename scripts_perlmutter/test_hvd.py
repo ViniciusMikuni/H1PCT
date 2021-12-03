@@ -6,12 +6,12 @@ import numpy as np
 
 hvd.init()
 
-assert hvd.mpi_threads_supported()
+#assert hvd.mpi_threads_supported()
 gpus = tf.config.experimental.list_physical_devices('GPU')
-# for gpu in gpus:
-#     tf.config.experimental.set_memory_growth(gpu, True)
-# if gpus:
-#     tf.config.experimental.set_visible_devices(gpus[hvd.local_rank()], 'GPU')
+for gpu in gpus:
+    tf.config.experimental.set_memory_growth(gpu, True)
+if gpus:
+    tf.config.experimental.set_visible_devices(gpus[hvd.local_rank()], 'GPU')
 
 #rank = MPI.COMM_WORLD.rank
 print(80*'#')

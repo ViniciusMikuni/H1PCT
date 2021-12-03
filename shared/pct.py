@@ -20,7 +20,7 @@ def GetLocalFeat(pc,outsize):
     features = Conv2D(outsize, kernel_size=[1,1], data_format='channels_last',
                       strides=[1,1],activation='relu')(features)
     #features = BatchNormalization()(features) 
-    features = tf.reduce_max(features, axis=-2)    
+    features = tf.reduce_mean(features, axis=-2)    
     return features
 
 
@@ -211,7 +211,7 @@ def PCT(npoints,nvars=1,nheads=1,nglobal=1):
     batch_size = tf.shape(inputs)[0]
             
     #k = 10
-    k = 5
+    k = 7
     
     mask = tf.where(inputs[:,:,2]==0,K.ones_like(inputs[:,:,2]),K.zeros_like(inputs[:,:,2]))
     adj,mask_matrix = pairwise_distanceR(inputs[:,:,:3],mask)
@@ -224,11 +224,11 @@ def PCT(npoints,nvars=1,nheads=1,nglobal=1):
     # nn_idx = knn(adj, k=k)
 
     # edge_feature_1 = GetEdgeFeat(features_0, nn_idx=nn_idx, k=k)    
-    # features_1 = GetLocalFeat(edge_feature_1,128)
+    # features_1 = GetLocalFeat(edge_feature_1,16*nheads)
     
     self_att_1,attention1 = GetSelfAtt(features_0,mask,16*nheads,nheads)
-    self_att_2,attention2 = GetSelfAtt(self_att_1,mask,16*nheads,nheads)
-    #self_att_3,attention3 = GetSelfAtt(self_att_2,mask,16*nheads,nheads)
+    self_att_2,attention2 = GetSelfAtt(features_0 + self_att_1,mask,16*nheads,nheads)
+    #self_att_3,attention3 = GetSelfAtt(features_1 + self_att_2,mask,16*nheads,nheads)
 
     concat = tf.concat([
         self_att_1,
@@ -243,16 +243,21 @@ def PCT(npoints,nvars=1,nheads=1,nglobal=1):
                  strides=1,activation='relu',
              )(concat)
     #net = BatchNormalization()(net) 
-    net = tf.reduce_mean(net, axis=1)
+    net_mean = tf.reduce_mean(net, axis=1)
+    net_max = tf.reduce_max(net, axis=1)
 
     #Process global inputs
-    # net_glob = Dense(32,activation='relu')(input_global)    
-    # net = tf.concat([net,net_glob],axis=-1)
+    net_glob = Dense(64 ,activation='relu')(input_global)    
+    net_glob = Dense(128 ,activation='relu')(net_glob)    
+    net = tf.concat([net_mean,net_max,net_glob],axis=-1)
+    #net = BatchNormalization()(net)
 
-    net = Dense(64,activation='relu')(net)
+    #net = tf.concat([net_mean,net_max],axis=-1)
+    net = Dense(128,activation='relu')(net)
+    
     #net = BatchNormalization()(net) 
-    net = Dropout(0.2)(net)
-    #net = Dense(64,activation='relu')(net)
+    #net = Dropout(0.2)(net)
+    net = Dense(64,activation='relu')(net)
     outputs = Dense(1,activation='sigmoid')(net)
     #return inputs,outputs
     return inputs,input_global,outputs
