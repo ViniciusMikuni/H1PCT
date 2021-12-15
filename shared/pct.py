@@ -34,35 +34,35 @@ def GetSelfAtt(pc,mask,outsize,nheads=1):
           Offset attention with shape (batch_size,num_point,outsize)
     '''
     
-    assert outsize%nheads==0, "Output size is not a multiple of the number of heads"
+    #assert outsize%nheads==0, "Output size is not a multiple of the number of heads"
     
     batch_size= tf.shape(pc)[0]
     #nparts = tf.shape(pc)[1]
     nparts = pc.get_shape()[1]
 
-    query = Conv1D(outsize, kernel_size = 1,use_bias=False,
+    query = Conv1D(outsize*nheads, kernel_size = 1,use_bias=False,
                    strides=1,activation=None)(pc) #B,N,C
     if nheads>1:
-        query = tf.reshape(query,[batch_size, nparts, outsize//nheads,nheads])
+        query = tf.reshape(query,[batch_size, nparts, outsize,nheads])
         query =tf.transpose(query,perm=[0,3,1,2])
     
     #query = BatchNormalization()(query) 
-    key = Conv1D(outsize, kernel_size = 1,use_bias=False,
+    key = Conv1D(outsize*nheads, kernel_size = 1,use_bias=False,
                  strides=1,activation=None)(pc)
     #key = BatchNormalization()(key)
 
     if nheads>1:
-        key = tf.reshape(key,[batch_size, nparts, outsize//nheads,nheads])
+        key = tf.reshape(key,[batch_size, nparts, outsize,nheads])
         key =tf.transpose(key,perm=[0,3,2,1])
     else:
         key = tf.transpose(key,perm=[0,2,1]) #B,C,N
 
-    value = Conv1D(outsize, kernel_size = 1,use_bias=False,
+    value = Conv1D(outsize*nheads, kernel_size = 1,use_bias=False,
                    strides=1,activation=None)(pc)    
     #value = BatchNormalization()(value)
 
     if nheads>1:
-        value = tf.reshape(value,[batch_size, nparts, outsize//nheads,nheads])
+        value = tf.reshape(value,[batch_size, nparts, outsize,nheads])
         value =tf.transpose(value,perm=[0,3,2,1])
     else:
         value = tf.transpose(value,perm=[0,2,1]) #B,C,N
@@ -91,7 +91,8 @@ def GetSelfAtt(pc,mask,outsize,nheads=1):
         
     self_att = tf.matmul(value,attention) #B,C,N
     if nheads>1:
-        self_att = tf.reshape(self_att,[batch_size, outsize,nparts])
+        self_att = tf.reduce_mean(self_att,1)
+        #self_att = tf.reshape(self_att,[batch_size, outsize,nparts])
         
     self_att = tf.transpose(self_att,perm=[0,2,1]) #B,N,C
 
@@ -148,26 +149,17 @@ def pairwise_distanceR(point_cloud, mask=None):
     point_cloud = point_cloud[:,:,:2] #eta-phi
   
     point_cloud_transpose = tf.transpose(point_cloud, perm=[0, 2, 1])
-    # point_cloud_phi = point_cloud_transpose[:,1:,:]
-    # point_cloud_phi = tf.tile(point_cloud_phi,[1,point_cloud_phi.get_shape()[2],1])
-    # point_cloud_phi_transpose = tf.transpose(point_cloud_phi,perm=[0, 2, 1])
-    # point_cloud_phi = tf.abs(point_cloud_phi - point_cloud_phi_transpose)
-    # is_bigger2pi = tf.greater_equal(tf.abs(point_cloud_phi),2*np.pi)
-    # point_cloud_phi_corr = tf.where(is_bigger2pi,4*np.pi**2-4*np.pi*point_cloud_phi,point_cloud_phi-point_cloud_phi)
     point_cloud_inner = tf.matmul(point_cloud, point_cloud_transpose) # x.x + y.y + z.z shape: NxN
     point_cloud_inner = -2*point_cloud_inner
     point_cloud_square = tf.reduce_sum(tf.square(point_cloud), axis=-1, keepdims=True) # from x.x, y.y, z.z to x.x + y.y + z.z
     point_cloud_square_tranpose = tf.transpose(point_cloud_square, perm=[0, 2, 1])
-
-    #print("shape",point_cloud_square.shape)
     if mask != None:
         zero_mask = 10000*tf.expand_dims(mask,-1)
         zero_mask_transpose = tf.transpose(zero_mask, perm=[0, 2, 1])
         zero_mask = zero_mask + zero_mask_transpose
         zero_mask = tf.where(tf.equal(zero_mask,20000),tf.zeros_like(zero_mask),zero_mask)
-    #+ zero_mask
     return point_cloud_square + point_cloud_inner + point_cloud_square_tranpose + zero_mask,zero_mask 
-#point_cloud_phi_corr+
+
 
 def pairwise_distance(point_cloud, mask=None): 
     """Compute pairwise distance of a point cloud.
@@ -211,54 +203,61 @@ def PCT(npoints,nvars=1,nheads=1,nglobal=1):
     batch_size = tf.shape(inputs)[0]
             
     #k = 10
-    k = 7
+    k = 5
     
     mask = tf.where(inputs[:,:,2]==0,K.ones_like(inputs[:,:,2]),K.zeros_like(inputs[:,:,2]))
     adj,mask_matrix = pairwise_distanceR(inputs[:,:,:3],mask)
-
     nn_idx = knn(adj, k=k)
-    edge_feature_0 = GetEdgeFeat(inputs, nn_idx=nn_idx, k=k)    
-    features_0 = GetLocalFeat(edge_feature_0,16*nheads)
-
-    # adj = pairwise_distance(features_0,mask_matrix)
-    # nn_idx = knn(adj, k=k)
-
-    # edge_feature_1 = GetEdgeFeat(features_0, nn_idx=nn_idx, k=k)    
-    # features_1 = GetLocalFeat(edge_feature_1,16*nheads)
+    net_trials = []
     
-    self_att_1,attention1 = GetSelfAtt(features_0,mask,16*nheads,nheads)
-    self_att_2,attention2 = GetSelfAtt(features_0 + self_att_1,mask,16*nheads,nheads)
-    #self_att_3,attention3 = GetSelfAtt(features_1 + self_att_2,mask,16*nheads,nheads)
+    for _ in range(nheads):
+        edge_feature_0 = GetEdgeFeat(inputs, nn_idx=nn_idx, k=k)    
+        features_0 = GetLocalFeat(edge_feature_0,64)
 
-    concat = tf.concat([
-        self_att_1,
-        self_att_2,
-        #self_att_3,    
-        features_0,
-     ]
-        ,axis=-1)
+        #adj = pairwise_distance(features_0,mask_matrix)
+        #nn_idx = knn(adj, k=k)
 
-    #128
-    net = Conv1D(128, kernel_size = 1,
-                 strides=1,activation='relu',
-             )(concat)
-    #net = BatchNormalization()(net) 
-    net_mean = tf.reduce_mean(net, axis=1)
-    net_max = tf.reduce_max(net, axis=1)
-
-    #Process global inputs
-    net_glob = Dense(64 ,activation='relu')(input_global)    
-    net_glob = Dense(128 ,activation='relu')(net_glob)    
-    net = tf.concat([net_mean,net_max,net_glob],axis=-1)
-    #net = BatchNormalization()(net)
-
-    #net = tf.concat([net_mean,net_max],axis=-1)
-    net = Dense(128,activation='relu')(net)
+        #edge_feature_1 = GetEdgeFeat(features_0, nn_idx=nn_idx, k=k)    
+        #features_1 = GetLocalFeat(edge_feature_1,32)
     
-    #net = BatchNormalization()(net) 
-    #net = Dropout(0.2)(net)
-    net = Dense(64,activation='relu')(net)
-    outputs = Dense(1,activation='sigmoid')(net)
+        self_att_1,attention1 = GetSelfAtt(features_0,mask,64)
+        self_att_2,attention2 = GetSelfAtt(features_0 + self_att_1,mask,64)
+        #self_att_3,attention3 = GetSelfAtt(features_1 + self_att_2,mask,32)
+
+        concat = tf.concat([
+            self_att_1,
+            self_att_2,
+            #self_att_3,    
+            features_0,
+        ]
+                           ,axis=-1)
+
+        #128
+        net = Conv1D(256, kernel_size = 1,
+                     strides=1,activation='relu')(concat)
+        #net = BatchNormalization()(net) 
+        net = tf.reduce_mean(net, axis=1)
+        #net_max = tf.reduce_max(net, axis=1)
+
+        #Process global inputs
+        net_glob = Dense(128 ,activation='relu')(input_global)    
+        net = tf.concat([net,net_glob],axis=-1)
+        net_trials.append(net)
+
+        
+    net_trials = tf.transpose(net_trials,perm=[1,0,2])
+    net = Conv1D(128, kernel_size = 1, strides=1,
+                 activation='relu')(net_trials)
+    
+    net = Conv1D(64, kernel_size = 1, strides=1,
+                 activation='relu')(net_trials)
+
+    net = Conv1D(1, kernel_size = 1, strides=1,
+                   activation='sigmoid')(net)
+
+    outputs = tf.reduce_mean(net,1) #Average over trials
+
+    
     #return inputs,outputs
     return inputs,input_global,outputs
 
