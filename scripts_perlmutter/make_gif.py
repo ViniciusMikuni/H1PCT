@@ -8,7 +8,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument('--folder', default='../plots_closure_pct', help='Folder containing figures')
 parser.add_argument('--plot', default='gen_jet_tau15', help='Name of the distribution to plot')
-parser.add_argument('--niter', type=int, default=30, help='Number of iterations to run over')
+parser.add_argument('--niter', type=int, default=5, help='Number of iterations to run over')
 flags = parser.parse_args()
 
 

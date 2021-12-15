@@ -14,6 +14,7 @@ sys.path.append('../')
 from shared.pct import PCT
 from shared.dense import MLP
 import json, yaml
+from datetime import datetime
 
 def weighted_binary_crossentropy(y_true, y_pred):
     weights = tf.gather(y_true, [1], axis=1) # event weights
@@ -45,7 +46,7 @@ def LoadJson(file_name):
 
 
 class Multifold():
-    def __init__(self,nevts,mode='hybrid',version = 'Closure',config_file='config_omnifold.json',verbose=1):
+    def __init__(self,nevts,nstrap=0,mode='hybrid',version = 'Closure',config_file='config_omnifold.json',verbose=1):
         self.mode = mode
         assert self.mode in ['PCT','hybrid','standard'], "ERROR: Omnifold mode not implemented"
         
@@ -55,13 +56,20 @@ class Multifold():
         self.log_file =  open('log_{}.txt'.format(self.version),'w')
         self.opt = LoadJson(config_file)
         self.niter = self.opt['General']['NITER']
-
-        
+        self.nstrap=nstrap
         self.mc_gen = None
         self.mc_reco = None
         self.global_vars = None
-        self.data=None        
+        self.data=None
 
+        tf.random.set_seed(19874*self.nstrap)
+        np.random.seed(19874*self.nstrap)
+        self.weights_folder = '../weights'
+        if self.nstrap>0:
+            self.weights_folder = '../weights_strap'
+        if not os.path.exists(self.weights_folder):
+            os.makedirs(self.weights_folder)
+            
     def Unfold(self):
         self.BATCH_SIZE=self.opt['General']['BATCH_SIZE']
         self.EPOCHS=self.opt['General']['EPOCHS']
@@ -76,14 +84,15 @@ class Multifold():
         min_distance = 1e6
         for i in range(self.niter):
             #self.CompileModel(max(1e-4/(2**i),1e-6))
+            #self.CompileModel(max(float(self.opt['General']['LR'])/(2**i),1e-7))
             print("ITERATION: {}".format(i + 1))            
             self.RunStep1(i)        
             old_weights=self.weights_push
             self.RunStep2(i)            
             if hvd.rank() == 0:
                 patience,min_distance = self.CompareDistance(patience,min_distance,old_weights,self.weights_push)
-                if patience >= max_patience:
-                    break
+                #if patience >= max_patience:
+                #    break
                 
 
     def RunStep1(self,i):
@@ -176,7 +185,7 @@ class Multifold():
             print("Train events used: {}, total number of train events: {}, percentage: {}".format(NTRAIN,np.sum(mask)*0.8, np.sum(mask)*0.8/NTRAIN))
             print(80*'#')
 
-        verbose = 1 if hvd.rank() == 0 else 0
+        verbose = 2 if hvd.rank() == 0 else 0
         
         callbacks = [
             hvd.callbacks.BroadcastGlobalVariablesCallback(0),
@@ -188,13 +197,18 @@ class Multifold():
             EarlyStopping(patience=self.opt['General']['NPATIENCE'],restore_best_weights=True)
         ]
         
-        base_name = "Omnifold_{}".format(self.mode)            
+        base_name = "Omnifold_{}".format(self.mode)
+        
         if hvd.rank() ==0:
-            if not os.path.exists('../weights'):
-                os.makedirs('../weights')  
-            callbacks.append(ModelCheckpoint('../weights/{}_{}_iter{}_step{}.h5'.format(base_name,self.version,iteration,stepn),
-                                             save_best_only=True,mode='auto',period=1,save_weights_only=True))
-
+            if self.nstrap>0:                
+                callbacks.append(
+                    ModelCheckpoint('{}/{}_{}_iter{}_step{}_strap{}.h5'.format(self.weights_folder,base_name,self.version,iteration,stepn,self.nstrap),
+                                    save_best_only=True,mode='auto',period=1,save_weights_only=True))
+            else:
+                callbacks.append(
+                    ModelCheckpoint('{}/{}_{}_iter{}_step{}.h5'.format(self.weights_folder,base_name,self.version,iteration,stepn),
+                                    save_best_only=True,mode='auto',period=1,save_weights_only=True))
+                
         _ =  model.fit(
             train_data,
             epochs=self.EPOCHS,
@@ -251,10 +265,14 @@ class Multifold():
 
 
     def PrepareInputs(self):
-        self.labels_mc = np.zeros(len(self.mc_reco))        
-        self.labels_data = np.ones(len(self.data))
-        self.labels_gen = np.ones(len(self.mc_gen))
-                          
+        #self.labels_mc = np.zeros(len(self.mc_reco))
+        #self.labels_data = np.ones(len(self.data))
+        #self.labels_gen = np.ones(len(self.mc_gen))
+
+        self.labels_mc = label_smoothing(np.zeros(len(self.mc_reco)),0.02)
+        self.labels_data = label_smoothing(np.ones(len(self.data)),0.02)
+        self.labels_gen = label_smoothing(np.ones(len(self.mc_gen)),0.02)
+
 
     def PrepareModel(self):
         if self.mode == 'PCT':
@@ -266,15 +284,15 @@ class Multifold():
                         
         elif self.mode == 'standard':
             nvars = self.mc_gen.shape[1]
-            inputs1,outputs1 = MLP(nvars)
-            inputs2,outputs2 = MLP(nvars)
+            inputs1,outputs1 = MLP(nvars,self.opt['MLP']['NTRIAL'])
+            inputs2,outputs2 = MLP(nvars,self.opt['MLP']['NTRIAL'])
                         
         elif self.mode == 'hybrid':
             nglobal = self.global_vars['reco'].shape[1]
             nvars = self.mc_gen.shape[1]
             input1,input_global1,outputs1 = PCT(self.opt['PCT']['NPOINT'],4,self.opt['PCT']['NHEAD'],nglobal)
             inputs1 = [input1,input_global1]
-            inputs2,outputs2 = MLP(nvars)
+            inputs2,outputs2 = MLP(nvars,self.opt['MLP']['NTRIAL'])
             
         self.model1 = Model(inputs=inputs1, outputs=outputs1)
         self.model2 = Model(inputs=inputs2, outputs=outputs2)

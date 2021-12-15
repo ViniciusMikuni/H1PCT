@@ -29,8 +29,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--data_folder', default='/pscratch/sd/v/vmikuni/H1', help='Folder containing data and MC files')
 parser.add_argument('--mode', default='hybrid', help='[standard/hybrid/PCT]')
 parser.add_argument('--config', default='config_general.json', help='Basic config file containing general options')
-parser.add_argument('--nevts', type=float,default=40e6, help='Number of events to load')
+parser.add_argument('--nevts', type=float,default=50e6, help='Number of events to load')
 parser.add_argument('--closure', action='store_true', default=False,help='Train omnifold for a closure test using simulation')
+parser.add_argument('--nstrap', type=int,default=0, help='Unique id for bootstrapping')
 parser.add_argument('--verbose', action='store_true', default=False,help='Display additional information during training')
 
 flags = parser.parse_args()
@@ -44,7 +45,8 @@ if flags.verbose:
 opt=LoadJson(flags.config)
 
 if flags.closure:
-    mc_names = ['Rapgap_nominal'] 
+    #mc_names = ['Rapgap_nominal']
+    mc_names = ['Djangoh_nominal'] 
 else:
     mc_names = opt['MC_NAMES']
 
@@ -57,7 +59,7 @@ elif flags.mode == 'hybrid':
     var_names = opt['VAR_PCT']
     gen_names = opt['VAR_MLP_GEN']
     global_names_reco = opt['GLOBAL_RECO']
-    global_names_gen = []
+    global_names_gen = opt['GLOBAL_GEN']
 elif flags.mode == 'PCT':
     var_names = opt['VAR_PCT']
     gen_names = opt['VAR_PCT_GEN']
@@ -70,11 +72,11 @@ else:
 nevts=int(flags.nevts)
 data_name = 'data'
 if flags.closure:
-    data_name = 'Djangoh_nominal'
+    #data_name = 'Djangoh_nominal'
+    data_name = 'Rapgap_nominal'
 
     
 for mc_name in mc_names:
-    
     
     global_vars = {}
     mc = h5.File(os.path.join(flags.data_folder,"{}.h5".format(mc_name)),'r')
@@ -82,7 +84,7 @@ for mc_name in mc_names:
 
 
     if flags.closure:
-        ntest = int(2e6)
+        ntest = int(2e6) #about same number of data events after reco selection
         data_vars = np.concatenate([np.expand_dims(data[var][hvd.rank():ntest:hvd.size()],-1) for var in var_names],-1)
         weights_data = data['wgt'][hvd.rank():ntest:hvd.size()]
         pass_reco = data['pass_reco'][hvd.rank():ntest:hvd.size()] #pass reco selection
@@ -103,6 +105,15 @@ for mc_name in mc_names:
             global_vars['data'] = np.concatenate([np.expand_dims(data[var][hvd.rank()::hvd.size()],-1) for var in global_names_reco],-1)
         else:
             global_vars['data'] = np.array([])
+        if flags.nstrap>0:
+            if flags.verbose:
+                print(80*"#")
+                print("Running booststrap with ID: {}".format(flags.nstrap))
+                print(80*"#")
+            weights_data = np.random.poisson(1,data_vars.shape[0])
+        else:
+            weights_data = np.ones(data_vars.shape[0])
+            
         
  
         
@@ -120,7 +131,7 @@ for mc_name in mc_names:
     
     #Same preprocessing over all tasks
     if flags.mode == "hybrid":
-        mean,std = Scaler(mc,global_names_reco)
+        mean,std = Scaler(mc,global_names_gen)
         global_vars['reco'] = (global_vars['reco']-mean)/std
         global_vars['data'] = (global_vars['data']-mean)/std        
         mean,std = Scaler(mc,gen_names)
@@ -130,7 +141,7 @@ for mc_name in mc_names:
         mc_gen[:,0][pass_truth==0] = -10
         
     if flags.mode == 'PCT':
-        mean,std = Scaler(mc,global_names_reco)
+        mean,std = Scaler(mc,global_names_gen)
         global_vars['reco'] = (global_vars['reco']-mean)/std
         global_vars['data'] = (global_vars['data']-mean)/std
         global_vars['gen'] = (global_vars['gen']-mean)/std
@@ -158,17 +169,17 @@ for mc_name in mc_names:
         print("Events passing reco cuts: {} Events passing gen cuts: {} ".format(np.sum(pass_reco==1),np.sum(pass_truth==1)))
         print(80*'#')
 
-
+    version = mc_name
     if flags.closure:
-        version = 'closure'
-    else:
-        version = mc_name.split('_')[1:]
-    
+        version += '_closure'
+        
+    K.clear_session()
     mfold = Multifold(
         mode=flags.mode,
         version = version,
         nevts=nevts,
-        verbose = flags.verbose,
+        nstrap=flags.nstrap,
+        verbose = flags.verbose,        
     )
 
     mfold.mc_gen = mc_gen
@@ -176,9 +187,6 @@ for mc_name in mc_names:
     mfold.data = data_vars
     mfold.global_vars=global_vars
 
-    if flags.closure:
-        mfold.Preprocessing(weights_mc=weights_MC_sim,weights_data=weights_data)
-    else:
-        mfold.Preprocessing(weights_mc=weights_MC_sim)
-
+    
+    mfold.Preprocessing(weights_mc=weights_MC_sim,weights_data=weights_data)    
     mfold.Unfold()

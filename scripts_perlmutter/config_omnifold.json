@@ -1,14 +1,15 @@
 {'General': {
-    'NITER': 100,
-    'LR': 1e-5,
-    'BATCH_SIZE': 256,
+    'NITER': 10,
+    'LR': 5e-5,
+    'BATCH_SIZE': 1024,
     'EPOCHS': 100,
-    'NWARMUP': 5,
+    'NWARMUP': 3,
     'NPATIENCE': 5,
 },
 'PCT': {
-    'NHEAD': 2,
-    'NPOINT': 30,
+    'NHEAD': 10,
+    'NPOINT': 20,
 },    
-'MLP':{    
+'MLP':{
+    'NTRIAL':10,
     }}
