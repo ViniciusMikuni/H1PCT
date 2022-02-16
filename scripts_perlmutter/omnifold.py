@@ -157,13 +157,13 @@ class Multifold():
                     {'input_1':sample[mask],
                      'input_2':global_vars[mask]}, 
                     np.stack((labels[mask],weights[mask]),axis=1))
-                ).shuffle(np.sum(mask))
+                ).cache().shuffle(np.sum(mask))
             else:
                 data = tf.data.Dataset.from_tensor_slices((
                     {'input_3':sample[mask],
                      'input_4':global_vars[mask]}, 
                     np.stack((labels[mask],weights[mask]),axis=1))
-                ).shuffle(np.sum(mask))
+                ).cache().shuffle(np.sum(mask))
                 
         else:
             mask = sample[:,0]!=-10
@@ -171,7 +171,7 @@ class Multifold():
             data = tf.data.Dataset.from_tensor_slices((
                 sample[mask],
                 np.stack((labels[mask],weights[mask]),axis=1))
-            ).shuffle(np.sum(mask))
+            ).cache().shuffle(np.sum(mask))
 
             
 
@@ -193,7 +193,7 @@ class Multifold():
             hvd.callbacks.LearningRateWarmupCallback(
                 initial_lr=self.hvd_lr, warmup_epochs=self.opt['General']['NWARMUP'],
                 verbose=verbose),
-            ReduceLROnPlateau(patience=3, min_lr=1e-7,verbose=verbose),
+            ReduceLROnPlateau(patience=5, min_lr=1e-7,verbose=verbose),
             EarlyStopping(patience=self.opt['General']['NPATIENCE'],restore_best_weights=True)
         ]
         
@@ -265,13 +265,13 @@ class Multifold():
 
 
     def PrepareInputs(self):
-        #self.labels_mc = np.zeros(len(self.mc_reco))
-        #self.labels_data = np.ones(len(self.data))
-        #self.labels_gen = np.ones(len(self.mc_gen))
+        self.labels_mc = np.zeros(len(self.mc_reco))
+        self.labels_data = np.ones(len(self.data))
+        self.labels_gen = np.ones(len(self.mc_gen))
 
-        self.labels_mc = label_smoothing(np.zeros(len(self.mc_reco)),0.02)
-        self.labels_data = label_smoothing(np.ones(len(self.data)),0.02)
-        self.labels_gen = label_smoothing(np.ones(len(self.mc_gen)),0.02)
+        self.labels_mc = label_smoothing(np.zeros(len(self.mc_reco)),0.01)
+        self.labels_data = label_smoothing(np.ones(len(self.data)),0.01)
+        self.labels_gen = label_smoothing(np.ones(len(self.mc_gen)),0.01)
 
 
     def PrepareModel(self):

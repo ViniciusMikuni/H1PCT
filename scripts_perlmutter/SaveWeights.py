@@ -8,6 +8,7 @@ import sys
 import h5py as h5
 from omnifold import  Multifold, Scaler, LoadJson
 import tensorflow as tf
+import tensorflow.keras.backend as K
 
 sys.path.append('../')
 import shared.options as opt
@@ -22,23 +23,28 @@ class MCInfo():
     def __init__(self,mc_name,N,data_folder,config,q2_int=0,use_mask=True):
         self.N = N
         self.file = h5.File(os.path.join(data_folder,"{}.h5".format(mc_name)),'r')
-        self.mask = self.file['pass_fiducial'][:self.N] == 1 #pass fiducial region definition
         self.use_mask = use_mask
         self.config = config
-        if q2_int>0:
-            gen_q2 = opt.dedicated_binning['gen_Q2']
-            self.mask *= ((self.file['gen_Q2'][:self.N] > gen_q2[q2_int-1]) & (self.file['gen_Q2'][:self.N] < gen_q2[q2_int]))
-        #self.fiducial_mask *= np.sum(self.file['gen_jet_part_pt'][:self.N] > 0,-1) < 20
         self.truth_mask = self.file['pass_truth'][:self.N] #pass truth region definition
+        
         if self.use_mask:
+            self.mask = self.file['pass_fiducial'][:self.N] == 1 #pass fiducial region definition
+            if q2_int>0:
+                gen_q2 = opt.dedicated_binning['gen_Q2']
+                self.mask *= ((self.file['gen_Q2'][:self.N] > gen_q2[q2_int-1]) & (self.file['gen_Q2'][:self.N] < gen_q2[q2_int]))
+                #self.fiducial_mask *= np.sum(self.file['gen_jet_part_pt'][:self.N] > 0,-1) < 20        
             self.nominal_wgts = self.file['wgt'][:self.N][self.mask]
         else:
             self.nominal_wgts = self.file['wgt'][:self.N]
+            
     def LoadVar(self,var):
         if self.use_mask:
             return_var = self.file[var][:self.N][self.mask]
         else:
             return_var = self.file[var][:self.N]
+        # if 'ncharged' in var:
+        #     #Binning should be open at the last bin
+        #     return_var[return_var>=opt.dedicated_binning['gen_jet_ncharged'][-1]] = 0
         if 'tau' in var:
             return_var = np.log(return_var)
         return return_var
@@ -100,34 +106,35 @@ class MCInfo():
 
 if __name__=='__main__':
     
-   parser = argparse.ArgumentParser()
-   parser.add_argument('--data_folder', default='/pscratch/sd/v/vmikuni/H1', help='Folder containing data and MC files')
-   parser.add_argument('--weights', default='../weights', help='Folder to store trained weights')
-   parser.add_argument('--mode', default='hybrid', help='Which train type to load [hybrid/standard/PCT]')
-   parser.add_argument('--config', default='config_general.json', help='Basic config file containing general options')
-   parser.add_argument('--out', default='/pscratch/sd/v/vmikuni/H1/weights', help='Folder to save the weights')
-   parser.add_argument('--niter', type=int, default=5, help='Omnifold iteration to load')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data_folder', default='/pscratch/sd/v/vmikuni/H1', help='Folder containing data and MC files')
+    parser.add_argument('--mode', default='hybrid', help='Which train type to load [hybrid/standard/PCT]')
+    parser.add_argument('--config', default='config_general.json', help='Basic config file containing general options')
+    parser.add_argument('--out', default='/pscratch/sd/v/vmikuni/H1/weights', help='Folder to save the weights')
+    parser.add_argument('--niter', type=int, default=5, help='Omnifold iteration to load')
    
-   flags = parser.parse_args()
-   config=LoadJson(flags.config)
+    flags = parser.parse_args()
+    config=LoadJson(flags.config)
    
-   ###################
-   #bootstrap weights#
-   ###################
-   base_name = "Omnifold_{}".format(flags.mode)
-   mc_names = ['Rapgap_nominal','Djangoh_nominal']
-   mc_info = {}
-   
-   for mc_name in mc_names:
-       print("{}.h5".format(mc_name))    
-       mc_info[mc_name] = MCInfo(mc_name,int(100e6),flags.data_folder,config,use_mask=False)
-       model_strap = '../weights_strap/{}_{}_iter{}_step2_strapX.h5'.format(
-           base_name,mc_name,flags.niter)
+    ###################
+    #bootstrap weights#
+    ###################
+    base_name = "Omnifold_{}".format(flags.mode)
+    mc_names = ['Rapgap_nominal']   
+    for mc_name in mc_names:
+        print("{}.h5".format(mc_name))    
+        mc_info = MCInfo(mc_name,int(100e6),flags.data_folder,config,use_mask=False)
+        model_strap = '../weights_strap/{}_{}_iter{}_step2_strapX.h5'.format(
+            base_name,mc_name,flags.niter)
+        mfold = mc_info.LoadDataWeights(flags.niter,mode=flags.mode)
+        for nstrap in range(69,config['NBOOTSTRAP']+1):
+            print(nstrap)
+            weights =  mc_info.Reweight(mfold,model_name=model_strap.replace('X',str(nstrap)))            
+            with h5.File(os.path.join(flags.out,'{}_{}.h5'.format(mc_name,nstrap)),'w') as fout:
+                dset = fout.create_dataset('wgt', data=weights)
+            del weights
+            K.clear_session()
+        del mc_info
 
-       mfold = mc_info[mc_name].LoadDataWeights(flags.niter,mode=flags.mode)
-       weights =  [mc_info[mc_name].Reweight(mfold,model_name=model_strap.replace('X',str(nstrap))) for nstrap in range(1,config['NBOOTSTRAP']+1)]
-       
-       weights=np.transpose(weights) #NxBootstraps
-       with h5.File(os.path.join(flags.out,mc_name+'.h5'),'w') as fout:
-           dset = fout.create_dataset('wgt', data=weights)
-   print(mc_info[mc_name].LoadTrainedWeights(os.path.join(flags.out,mc_name+'.h5'))[:100])
+    
+   # print(mc_info[mc_name].LoadTrainedWeights(os.path.join(flags.out,mc_name+'.h5'))[:100])

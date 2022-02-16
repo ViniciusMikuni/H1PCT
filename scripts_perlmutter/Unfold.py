@@ -23,13 +23,12 @@ if gpus:
 # tf.random.set_seed(1234)
 # np.random.seed(1234)
 
-
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--data_folder', default='/pscratch/sd/v/vmikuni/H1', help='Folder containing data and MC files')
 parser.add_argument('--mode', default='hybrid', help='[standard/hybrid/PCT]')
 parser.add_argument('--config', default='config_general.json', help='Basic config file containing general options')
-parser.add_argument('--nevts', type=float,default=50e6, help='Number of events to load')
+parser.add_argument('--nevts', type=float,default=30e6, help='Number of events to load')
 parser.add_argument('--closure', action='store_true', default=False,help='Train omnifold for a closure test using simulation')
 parser.add_argument('--nstrap', type=int,default=0, help='Unique id for bootstrapping')
 parser.add_argument('--verbose', action='store_true', default=False,help='Display additional information during training')
@@ -41,12 +40,11 @@ if flags.verbose:
     print("Total hvd size {}, rank: {}, local size: {}, local rank{}".format(hvd.size(), hvd.rank(), hvd.local_size(), hvd.local_rank()))
     print(80*'#')
 
-
 opt=LoadJson(flags.config)
 
 if flags.closure:
-    #mc_names = ['Rapgap_nominal']
-    mc_names = ['Djangoh_nominal'] 
+    mc_names = ['Rapgap_nominal']
+    #mc_names = ['Djangoh_nominal'] 
 else:
     mc_names = opt['MC_NAMES']
 
@@ -72,8 +70,8 @@ else:
 nevts=int(flags.nevts)
 data_name = 'data'
 if flags.closure:
-    #data_name = 'Djangoh_nominal'
-    data_name = 'Rapgap_nominal'
+    data_name = 'Djangoh_nominal'
+    #data_name = 'Rapgap_nominal'
 
     
 for mc_name in mc_names:
@@ -84,7 +82,7 @@ for mc_name in mc_names:
 
 
     if flags.closure:
-        ntest = int(2e6) #about same number of data events after reco selection
+        ntest = int(4e6) #about same number of data events after reco selection
         data_vars = np.concatenate([np.expand_dims(data[var][hvd.rank():ntest:hvd.size()],-1) for var in var_names],-1)
         weights_data = data['wgt'][hvd.rank():ntest:hvd.size()]
         pass_reco = data['pass_reco'][hvd.rank():ntest:hvd.size()] #pass reco selection

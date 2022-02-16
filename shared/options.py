@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
+from matplotlib.collections import PatchCollection
+from matplotlib.patches import Rectangle
 
 colors = {
     'LO':'b', 
@@ -42,17 +44,22 @@ markers = {
 }
 
 dedicated_binning = {
-    'gen_jet_ncharged':np.linspace(1,11,10), 
-    'gen_jet_charge':np.linspace(-0.9,0.9,10),
+    'gen_jet_ncharged':np.linspace(1,10-1e-8,10), 
+    'gen_jet_charge':np.linspace(-0.8,0.8,10),
     'genjet_pt': np.logspace(np.log10(10),np.log10(100),7),
     'genjet_eta':np.linspace(-1,2.5,6),
     'genjet_phi':np.linspace(-3.14,3.14,8),
-    'gen_jet_tau10':np.linspace(-2.2,-1,10),
-    'gen_jet_tau15':np.linspace(-3,-1,10),
-    'gen_jet_tau20':np.linspace(-3.5,-1,10),
+    
+    'gen_jet_tau10':np.linspace(-2.2,-1,8),
+    'gen_jet_tau15':np.linspace(-3,-1.2,8),
+    'gen_jet_tau20':np.linspace(-3.5,-1.5,8),
 
-    'gen_jet_ptD':np.linspace(0.2,0.7,10),
-    'gen_Q2':np.logspace(np.log10(200),np.log10(1000), 5),
+    # 'gen_jet_tau10':np.linspace(0,0.2,10),
+    # 'gen_jet_tau15':np.linspace(0,0.2,10),
+    # 'gen_jet_tau20':np.linspace(0,0.2,10),
+
+    'gen_jet_ptD':np.linspace(0.3,0.7,10),
+    'gen_Q2':np.logspace(np.log10(150),np.log10(5000), 5),
 }
 
 sys_sources = {
@@ -145,7 +152,7 @@ def FormatFig(xlabel,ylabel,ax0):
     ax0.set_ylabel(ylabel)
         
 
-    xposition = 0.9
+    xposition = 0.98
     yposition=1.03
     text = 'H1'
     WriteText(xposition,yposition,text,ax0)
@@ -160,3 +167,21 @@ def WriteText(xpos,ypos,text,ax0):
 
 
     
+
+def make_error_boxes(ax, xdata, ydata, xerror, yerror, facecolor='r',
+                     edgecolor='None', alpha=0.5):
+
+    # Loop over data points; create box from errors at each point
+    errorboxes = [Rectangle((x - xe[0], y - ye[0]), xe.sum(), ye.sum())
+                  for x, y, xe, ye in zip(xdata, ydata, xerror.T, yerror.T)]
+
+    # Create patch collection with specified colour/alpha
+    pc = PatchCollection(errorboxes, facecolor=facecolor, alpha=alpha,
+                         edgecolor=edgecolor)
+
+    # Add collection to axes
+    ax.add_collection(pc)
+
+    # Plot errorbars
+    artists = ax.errorbar(xdata, ydata, xerr=xerror, yerr=yerror,
+                          fmt='None', ecolor='k')
