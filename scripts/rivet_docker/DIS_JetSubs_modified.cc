@@ -1,5 +1,3 @@
-// -*- C++ -*-
-
 #include "Rivet/Analysis.hh"
 #include "Rivet/Projections/FinalState.hh"
 #include "Rivet/Projections/FastJets.hh"
@@ -10,7 +8,7 @@ namespace Rivet {
   class DIS_JetSubs : public Analysis {
   public:
     /// Constructor
-    RIVET_DEFAULT_ANALYSIS_CTOR(DIS_JetSubs);
+    DEFAULT_RIVET_ANALYSIS_CTOR(DIS_JetSubs);
     /// Book histograms and initialise projections before the run
     void init() {
 
@@ -27,7 +25,7 @@ namespace Rivet {
       declare(jetfs, "jets");
 
       // Book histograms
-	
+      
       book(_hist_Q2, "Q2",logspace(4,150, 5000.0));
       
       book(_hist_ncharge, "gen_jet_ncharged",linspace(19,1,20));
@@ -52,24 +50,28 @@ namespace Rivet {
       // Get the DIS kinematics
       const DISKinematics& dk = apply<DISKinematics>(event, "Kinematics");
       if ( dk.failed() ) return;
-      double y  = dk.y();
-      double Q2 = dk.Q2();
-
-      if (Q2 < 150.0*GeV2) vetoEvent;
-      if ( y>0.7) vetoEvent;
-      if(y<0.2) vetoEvent;
+      const DISLepton& dl = apply<DISLepton>(event,"Lepton");
+      if ( dl.failed() ) return;
       
-      // Weight of the event
+      FourMomentum eout = dl.out().momentum()*GeV; //Weird unit mixing, dl.out gives units of GeV but dl.in() gives MeV??? todo                                                          
+      FourMomentum ein = dl.in().momentum()*MeV;
+      FourMomentum proton = dk.beamHadron().momentum()*MeV;
+      FourMomentum photon = ein-eout;
+      
+      double Q2 = -photon.mass2();
+      //double x     = Q2 / (2.*proton*photon);
+      double y     = (proton * photon) / (proton* ein);
+     
+      if (Q2 < 150.0*GeV2) vetoEvent;
+      if (y>0.7) vetoEvent;
+      if(y<0.2) vetoEvent;
+            // Weight of the event
       _hist_Q2->fill(Q2);
 
       // Momentum of the scattered lepton
-      const DISLepton& dl = apply<DISLepton>(event,"Lepton");
-      if ( dl.failed() ) return;
-      const FourMomentum leptonMom = dl.out();
-      const double enel = leptonMom.E();
-      
+      const double enel = eout.E();
       if(enel<11*GeV) vetoEvent;
-       // Extract the particles other than the lepton
+      // Extract the particles other than the lepton
       const FinalState& fs = apply<FinalState>(event, "FS");
       Particles particles;
       particles.reserve(fs.particles().size());
@@ -81,7 +83,7 @@ namespace Rivet {
       }
 
       
-       // Retrieve clustered jets, sorted by pT, with a minimum pT cut
+      // Retrieve clustered jets, sorted by pT, with a minimum pT cut
       //float qt = 0;
       Jets jets = apply<FastJets>(event, "jets").jetsByPt(Cuts::pT > 10*GeV && Cuts::eta < 2.5 && Cuts::eta>-1.0);  
       for (int i = 0; i < jets.size(); ++i){
@@ -101,12 +103,12 @@ namespace Rivet {
 	  gen_tau10+=p.pt()*pow(deltaR(p,jets[i]),1);
 	  gen_tau15+=p.pt()*pow(deltaR(p,jets[i]),1.5);
 	  gen_tau20+=p.pt()*pow(deltaR(p,jets[i]),2);
-	  
-	  if (p.charge() != 0){
+	    
+	  if (p.charge3() != 0){
 	    gen_ncharged += 1;
-	    gen_jet_charge += p.charge() *p.pt(); 
+	    gen_jet_charge += p.charge3() *p.pt(); 
 	  }
-	  
+	    
 	}
 	
 	_hist_charge->fill(gen_jet_charge/jetmom.pt());
@@ -145,7 +147,6 @@ namespace Rivet {
 
 
   // The hook for the plugin system
-  RIVET_DECLARE_PLUGIN(DIS_JetSubs);
+  DECLARE_RIVET_PLUGIN(DIS_JetSubs);
 
 }
-    
