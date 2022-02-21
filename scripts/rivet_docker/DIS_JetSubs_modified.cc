@@ -104,9 +104,9 @@ namespace Rivet {
 	  gen_tau15+=p.pt()*pow(deltaR(p,jets[i]),1.5);
 	  gen_tau20+=p.pt()*pow(deltaR(p,jets[i]),2);
 	    
-	  if (p.charge3() != 0){
+	  if (p.charge() != 0){
 	    gen_ncharged += 1;
-	    gen_jet_charge += p.charge3() *p.pt(); 
+	    gen_jet_charge += p.charge() *p.pt(); 
 	  }
 	    
 	}
