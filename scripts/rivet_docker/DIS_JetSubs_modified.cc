@@ -34,7 +34,7 @@ namespace Rivet {
       book(_hist_tau10, "gen_jet_tau10",7,-2.2,-1);
       book(_hist_tau15, "gen_jet_tau15",7,-3.0,-1.2);
       book(_hist_tau20, "gen_jet_tau20",7,-3.5,-1.5);
-      // book(_hist_z, "gen_jet_z",7,0.1,1.0);
+      book(_hist_z, "gen_jet_z",7,0.1,1.0);
       
       book(_hist_ncharge2D, "gen_jet_ncharged2D",linspace(19,1,20,5),logspace(4,150, 5000.0));
       book(_hist_charge2D, "gen_jet_charge2D",linspace(9,-0.8,0.8),logspace(4,150, 5000.0));
@@ -42,7 +42,7 @@ namespace Rivet {
       book(_hist_tau102D, "gen_jet_tau102D",linspace(7,-2.2,-1),logspace(4,150, 5000.0));
       book(_hist_tau152D, "gen_jet_tau152D",linspace(7,-3.0,-1.2),logspace(4,150, 5000.0));
       book(_hist_tau202D, "gen_jet_tau202D",linspace(7,-3.5,-1.5),logspace(4,150, 5000.0));
-      // book(_hist_z2D, "gen_jet_z2D",linspace(7,0.1,1.0),logspace(4,150, 5000.0));
+      book(_hist_z2D, "gen_jet_z2D",linspace(7,0.1,1.0),logspace(4,150, 5000.0));
       
     }
 
