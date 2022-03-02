@@ -35,6 +35,7 @@ namespace Rivet {
       book(_hist_tau15, "gen_jet_tau15",7,-3.0,-1.2);
       book(_hist_tau20, "gen_jet_tau20",7,-3.5,-1.5);
       book(_hist_z, "gen_jet_z",7,0.1,1.0);
+      book(_hist_z1, "gen_jet_z1",7,0.1,1.0);
       
       book(_hist_ncharge2D, "gen_jet_ncharged2D",linspace(19,1,20,5),logspace(4,150, 5000.0));
       book(_hist_charge2D, "gen_jet_charge2D",linspace(9,-0.8,0.8),logspace(4,150, 5000.0));
@@ -43,6 +44,7 @@ namespace Rivet {
       book(_hist_tau152D, "gen_jet_tau152D",linspace(7,-3.0,-1.2),logspace(4,150, 5000.0));
       book(_hist_tau202D, "gen_jet_tau202D",linspace(7,-3.5,-1.5),logspace(4,150, 5000.0));
       book(_hist_z2D, "gen_jet_z2D",linspace(7,0.1,1.0),logspace(4,150, 5000.0));
+      book(_hist_z12D, "gen_jet_z12D",linspace(7,0.1,1.0),logspace(4,150, 5000.0));
       
     }
 
@@ -98,6 +100,7 @@ namespace Rivet {
 	float sumpt=0;
 	float maxpt=0;
 	float z=0;
+	float z1=0;
 	FourMomentum jetmom = jets[i].momentum();
 	for (const Particle& p : jets[i].particles()) {
 	  //PseudoJet hfs_candidate = PseudoJet(p.px(), p.py(), p.pz(), p.energy());
@@ -106,14 +109,19 @@ namespace Rivet {
 	  gen_tau10+=p.pt()*pow(deltaR(p,jets[i]),1);
 	  gen_tau15+=p.pt()*pow(deltaR(p,jets[i]),1.5);
 	  gen_tau20+=p.pt()*pow(deltaR(p,jets[i]),2);
+	  
+	  float jet_abs = pow(jetmom.px(), 2) + pow(jetmom.py(), 2)+pow(jetmom.pz(), 2);
+	  z = (p.px()*jetmom.px() + p.py()*jetmom.py() + p.pz()*jetmom.pz())/jet_abs;
+	  _hist_z->fill(z);
+	  _hist_z2D->fill(z,Q2);
 	  if (p.pt()>maxpt){
 	    maxpt = p.pt();
-	    z = (p.px()*jetmom.px() + p.py()*jetmom.py())/jetmom.pt();
+	    z1=z;
 	  }
 	    
 	  if (p.charge() != 0){
 	    gen_ncharged += 1;
-	    gen_jet_charge += p.charge() *p.pt(); 
+	    gen_jet_charge += p.charge() *p.pt();	  
 	  }
 	    
 	}
@@ -124,7 +132,7 @@ namespace Rivet {
 	_hist_tau10->fill(log(gen_tau10/jetmom.pt()));
 	_hist_tau15->fill(log(gen_tau15/jetmom.pt()));
 	_hist_tau20->fill(log(gen_tau20/jetmom.pt()));
-	_hist_z->fill(z/jetmom.pt());
+	_hist_z->fill(z1);
 
 	_hist_charge2D->fill(gen_jet_charge/jetmom.pt(),Q2);
 	_hist_ptD2D->fill(pow(gen_jet_ptD,0.5)/sumpt,Q2);
@@ -132,7 +140,7 @@ namespace Rivet {
 	_hist_tau102D->fill(log(gen_tau10/jetmom.pt()),Q2);
 	_hist_tau152D->fill(log(gen_tau15/jetmom.pt()),Q2);
 	_hist_tau202D->fill(log(gen_tau20/jetmom.pt()),Q2);
-	_hist_z2D->fill(z/jetmom.pt(),Q2);
+	_hist_z2D->fill(z1,Q2);
 
 	
       }
@@ -148,10 +156,8 @@ namespace Rivet {
 
 
     /// The histograms.
-    Histo1DPtr _hist_Q2, _hist_ncharge, _hist_charge, _hist_ptD, _hist_tau10,  _hist_tau15,  _hist_tau20;
-      //,_hist_z;
-    Histo2DPtr  _hist_ncharge2D, _hist_charge2D, _hist_ptD2D, _hist_tau102D,  _hist_tau152D,  _hist_tau202D;
-      //,_hist_z2D;
+    Histo1DPtr _hist_Q2, _hist_ncharge, _hist_charge, _hist_ptD, _hist_tau10,  _hist_tau15,  _hist_tau20,_hist_z,_hist_z1 ;
+    Histo2DPtr  _hist_ncharge2D, _hist_charge2D, _hist_ptD2D, _hist_tau102D,  _hist_tau152D,  _hist_tau202D,_hist_z2D,_hist_z12D;
     
 
   };
