@@ -3,16 +3,18 @@ import matplotlib.pyplot as plt
 from matplotlib import gridspec
 from matplotlib.collections import PatchCollection
 from matplotlib.patches import Rectangle
-
+import uproot3 as uproot
+    
 colors = {
     'LO':'b', 
     'NLO':'g',
     'NNLO':'r', 
-    'TMD': '#9467bd',
+    'Pythia_Vincia': '#9467bd',
+    'Pythia_Dire': 'indigo',
     'Pythia':'blueviolet',
     'Djangoh':'#8c564b',
     'Rapgap':'darkorange',
-    'Sherpa':'crimson',
+    'Herwig':'crimson',
     'Cascade':'b',
     
     'PCT': 'g',    
@@ -21,30 +23,21 @@ colors = {
 }
 
 
-
-styles = {
-    'LO':'-',
-    'NLO':'dotted',
-    'NNLO':'-',
-    'TMD': '-',
-    'Pythia':'-',
-    'Djangoh':'dotted',
-    'Rapgap':'-',
-    'Sherpa':'-',
-    'Cascade':'-',    
-}
-
 markers = {
     'Djangoh':'D',
     'Rapgap':'X',
-    
+
+    'Pythia': '^',
+    'Pythia_Vincia': '<',
+    'Pythia_Dire': '>',
+    'Herwig':'P',
     'PCT':'P',
     'standard':'o',
     'hybrid':'x',
 }
 
 dedicated_binning = {
-    'gen_jet_ncharged':np.linspace(1,10-1e-8,10), 
+    'gen_jet_ncharged':np.linspace(1,15-1e-8,15), 
     'gen_jet_charge':np.linspace(-0.8,0.8,10),
     'genjet_pt': np.logspace(np.log10(10),np.log10(100),7),
     'genjet_eta':np.linspace(-1,2.5,6),
@@ -63,11 +56,11 @@ dedicated_binning = {
 }
 
 sys_sources = {
-    'sys_0':'#66c2a5',
-    'sys_1':'#fc8d62',
-    'sys_5':'#a6d854',
-    'sys_7':'#ffd92f',
-    'sys_11':'#8da0cb',
+    # 'sys_0':'#66c2a5',
+    # 'sys_1':'#fc8d62',
+    # 'sys_5':'#a6d854',
+    # 'sys_7':'#ffd92f',
+    # 'sys_11':'#8da0cb',
     'model':'#e78ac3',
     'closure': '#e5c494',
     'stat':'#808000'
@@ -84,6 +77,15 @@ sys_translate = {
     'closure': 'Non-closure',
     'stat':'Stat.',
 }
+
+name_translate = {
+    'Herwig': "Herwig",
+    'Pythia': 'Pythia',
+    'Pythia_Vincia':'Pythia + Vincia',
+    'Pythia_Dire':'Pythia + Dire',
+
+}
+
 
 # dedicated_binning = {
 #     'gen_jet_ncharged':np.linspace(1,15,14),
@@ -108,7 +110,23 @@ sys_translate = {
 # }
 
 
-
+def LoadFromROOT(file_name,var_name,q2_bin=0):
+    with uproot.open(file_name) as f:
+        if b'DIS_JetSubs;1' in f.keys():
+            #Predictions from rivet
+            hist = f[b'DIS_JetSubs;1']            
+        else:
+            hist = f
+        if q2_bin ==0:
+            var, bins =  hist[var_name].numpy()            
+        else: #2D slice of histogram
+            var =  hist[var_name+"2D"].numpy()[0][:,q2_bin-1]
+            bins = hist[var_name+"2D"].numpy()[1][0][0]
+        norm = 0
+        for iv, val in enumerate(var):
+            norm += val*abs(bins[iv+1]-bins[iv])
+        return var/norm
+        
 def SetStyle():
     from matplotlib import rc
     rc('text', usetex=True)
@@ -154,7 +172,7 @@ def FormatFig(xlabel,ylabel,ax0):
 
     xposition = 0.98
     yposition=1.03
-    text = 'H1'
+    text = 'H1 Preliminary'
     WriteText(xposition,yposition,text,ax0)
 
 

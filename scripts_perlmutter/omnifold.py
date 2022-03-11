@@ -62,8 +62,8 @@ class Multifold():
         self.global_vars = None
         self.data=None
 
-        tf.random.set_seed(19874*self.nstrap)
-        np.random.seed(19874*self.nstrap)
+        # tf.random.set_seed(19874*self.nstrap)
+        # np.random.seed(19874*self.nstrap)
         self.weights_folder = '../weights'
         if self.nstrap>0:
             self.weights_folder = '../weights_strap'
@@ -119,7 +119,7 @@ class Multifold():
             
         new_weights[self.not_pass_reco]=1.0
         self.weights_pull = self.weights_push *new_weights
-        #self.weights_pull = self.weights_pull/np.average(self.weights_pull)
+        self.weights_pull = self.weights_pull/np.average(self.weights_pull)
 
     def RunStep2(self,i):
         '''Gen to Gen reweighing'''        
@@ -157,13 +157,13 @@ class Multifold():
                     {'input_1':sample[mask],
                      'input_2':global_vars[mask]}, 
                     np.stack((labels[mask],weights[mask]),axis=1))
-                ).cache().shuffle(np.sum(mask))
+                ).shuffle(np.sum(mask))
             else:
                 data = tf.data.Dataset.from_tensor_slices((
                     {'input_3':sample[mask],
                      'input_4':global_vars[mask]}, 
                     np.stack((labels[mask],weights[mask]),axis=1))
-                ).cache().shuffle(np.sum(mask))
+                ).shuffle(np.sum(mask))
                 
         else:
             mask = sample[:,0]!=-10
@@ -269,9 +269,9 @@ class Multifold():
         self.labels_data = np.ones(len(self.data))
         self.labels_gen = np.ones(len(self.mc_gen))
 
-        self.labels_mc = label_smoothing(np.zeros(len(self.mc_reco)),0.01)
-        self.labels_data = label_smoothing(np.ones(len(self.data)),0.01)
-        self.labels_gen = label_smoothing(np.ones(len(self.mc_gen)),0.01)
+        # self.labels_mc = label_smoothing(np.zeros(len(self.mc_reco)),0.01)
+        # self.labels_data = label_smoothing(np.ones(len(self.data)),0.01)
+        # self.labels_gen = label_smoothing(np.ones(len(self.mc_gen)),0.01)
 
 
     def PrepareModel(self):
@@ -312,6 +312,7 @@ class Multifold():
     def reweight(self,events,model):
         f = np.nan_to_num(model.predict(events, batch_size=10000),posinf=1,neginf=0)
         weights = f / (1. - f)
+        #weights = np.clip(weights,0,10)
         weights = weights[:,0]
         return np.squeeze(np.nan_to_num(weights,posinf=1))
 

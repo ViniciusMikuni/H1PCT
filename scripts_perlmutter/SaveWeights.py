@@ -9,7 +9,6 @@ import h5py as h5
 from omnifold import  Multifold, Scaler, LoadJson
 import tensorflow as tf
 import tensorflow.keras.backend as K
-
 sys.path.append('../')
 import shared.options as opt
 gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -42,11 +41,8 @@ class MCInfo():
             return_var = self.file[var][:self.N][self.mask]
         else:
             return_var = self.file[var][:self.N]
-        # if 'ncharged' in var:
-        #     #Binning should be open at the last bin
-        #     return_var[return_var>=opt.dedicated_binning['gen_jet_ncharged'][-1]] = 0
         if 'tau' in var:
-            return_var = np.log(return_var)
+            return_var = np.ma.log(return_var).filled(0)
         return return_var
 
 
@@ -75,6 +71,10 @@ class MCInfo():
 
         mfold.global_vars = {'reco':global_vars}
         data = np.concatenate([np.expand_dims(self.file[var][:self.N],-1) for var in var_names],-1)
+        # if mode != 'PCT':
+        #     tau_idx = [4,5,6] #CAUTION!!! IF THAT CHANGES REMEMBER TO CHANGE THIS LINE TOO
+        #     for idx in tau_idx:
+        #         data[:,idx] = np.ma.log(data[:,idx]).filled(0)
         
         if mode != "PCT":
             mean,std = Scaler(self.file,var_names)
@@ -101,7 +101,6 @@ class MCInfo():
         return weights
         
             
-
 
 
 if __name__=='__main__':
