@@ -28,7 +28,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--data_folder', default='/pscratch/sd/v/vmikuni/H1', help='Folder containing data and MC files')
 parser.add_argument('--mode', default='hybrid', help='[standard/hybrid/PCT]')
 parser.add_argument('--config', default='config_general.json', help='Basic config file containing general options')
-parser.add_argument('--nevts', type=float,default=30e6, help='Number of events to load')
+parser.add_argument('--nevts', type=float,default=25e6, help='Number of events to load')
 parser.add_argument('--closure', action='store_true', default=False,help='Train omnifold for a closure test using simulation')
 parser.add_argument('--nstrap', type=int,default=0, help='Unique id for bootstrapping')
 parser.add_argument('--verbose', action='store_true', default=False,help='Display additional information during training')
@@ -57,7 +57,7 @@ elif flags.mode == 'hybrid':
     var_names = opt['VAR_PCT']
     gen_names = opt['VAR_MLP_GEN']
     global_names_reco = opt['GLOBAL_RECO']
-    global_names_gen = opt['GLOBAL_GEN']
+    global_names_gen = []
 elif flags.mode == 'PCT':
     var_names = opt['VAR_PCT']
     gen_names = opt['VAR_PCT_GEN']
@@ -82,7 +82,7 @@ for mc_name in mc_names:
 
 
     if flags.closure:
-        ntest = int(4e6) #about same number of data events after reco selection
+        ntest = int(10e6) #about same number of data events after reco selection
         data_vars = np.concatenate([np.expand_dims(data[var][hvd.rank():ntest:hvd.size()],-1) for var in var_names],-1)
         weights_data = data['wgt'][hvd.rank():ntest:hvd.size()]
         pass_reco = data['pass_reco'][hvd.rank():ntest:hvd.size()] #pass reco selection
@@ -107,6 +107,7 @@ for mc_name in mc_names:
             if flags.verbose:
                 print(80*"#")
                 print("Running booststrap with ID: {}".format(flags.nstrap))
+                np.random.seed(flags.nstrap*hvd.rank())
                 print(80*"#")
             weights_data = np.random.poisson(1,data_vars.shape[0])
         else:
@@ -116,11 +117,16 @@ for mc_name in mc_names:
  
         
     mc_reco = np.concatenate([np.expand_dims(mc[var][hvd.rank():nevts:hvd.size()],-1) for var in var_names],-1)
-    mc_gen = np.concatenate([np.expand_dims(mc[var][hvd.rank():nevts:hvd.size()],-1) for var in gen_names],-1)
+    mc_gen = np.concatenate([np.expand_dims(mc[var][hvd.rank():nevts:hvd.size()],-1) for var in gen_names],-1)    
     if flags.mode != 'standard':
         global_vars['reco'] = np.concatenate([np.expand_dims(mc[var][hvd.rank():nevts:hvd.size()],-1) for var in global_names_reco],-1)
         if flags.mode == "PCT":
-            global_vars['gen'] = np.concatenate([np.expand_dims(mc[var][hvd.rank():nevts:hvd.size()],-1) for var in global_names_gen],-1)    
+            global_vars['gen'] = np.concatenate([np.expand_dims(mc[var][hvd.rank():nevts:hvd.size()],-1) for var in global_names_gen],-1)
+        else:
+            pass
+            # tau_idx = [4,5,6] #CAUTION!!! IF THAT CHANGES REMEMBER TO CHANGE THIS LINE TOO
+            # for idx in tau_idx:
+            #     mc_gen[:,idx] = np.ma.log(mc_gen[:,idx]).filled(0)
 
     weights_MC_sim = mc['wgt'][hvd.rank():nevts:hvd.size()]
     pass_reco = mc['pass_reco'][hvd.rank():nevts:hvd.size()] #pass fiducial selection
@@ -129,7 +135,7 @@ for mc_name in mc_names:
     
     #Same preprocessing over all tasks
     if flags.mode == "hybrid":
-        mean,std = Scaler(mc,global_names_gen)
+        mean,std = Scaler(mc,global_names_reco)
         global_vars['reco'] = (global_vars['reco']-mean)/std
         global_vars['data'] = (global_vars['data']-mean)/std        
         mean,std = Scaler(mc,gen_names)
@@ -159,7 +165,7 @@ for mc_name in mc_names:
     del mc
     del data
 
-    weights_MC_sim = weights_MC_sim/np.average(weights_MC_sim)
+    weights_MC_sim = weights_MC_sim/np.average(weights_MC_sim[pass_reco==1])
     weights_MC_sim *= 1.0*data_vars.shape[0]/weights_MC_sim[pass_reco==1].shape[0]
     
     if flags.verbose:

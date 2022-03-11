@@ -1,6 +1,6 @@
 import tensorflow as tf
 import tensorflow.keras.backend as K
-
+import tensorflow_probability as tfp
 from tensorflow.keras.layers import Dense, Input, Dropout, Conv1D, BatchNormalization
 from tensorflow.keras.models import Model
 import numpy as np
@@ -35,11 +35,14 @@ def MLP(nvars,NTRIALS=10):
     inputs = Input((nvars, ))
     net_trials = []
     for _ in range(NTRIALS):            
-        layer = Dense(50,activation='relu')(inputs)    
-        layer1 = Dense(50, activation='relu')(layer)
-        layer = Dense(50,activation='relu')(layer+layer1)    
+        layer = Dense(64,activation='relu')(inputs)
+        layer = Dense(128, activation='relu')(layer)
+        layer = Dense(64,activation='relu')(layer)
+        #layer = Dropout(0.05)(layer) 
         layer = Dense(1,activation='sigmoid')(layer)
         net_trials.append(layer)
-        
+
+    #outputs = tfp.stats.percentile(net_trials, 50.0, interpolation='midpoint',axis=0)
     outputs = tf.reduce_mean(net_trials,0) #Average over trials
+    #outputs = tf.keras.activations.sigmoid(outputs)
     return inputs,outputs

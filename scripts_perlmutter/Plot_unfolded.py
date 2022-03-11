@@ -35,11 +35,13 @@ flags.N = int(flags.N)
 config=LoadJson(flags.config)
 
 mc_names = ['Rapgap_nominal','Djangoh_nominal']
+standalone_predictions = ['Herwig','Pythia','Pythia_Vincia','Pythia_Dire']
+#standalone_predictions = []
     
-data_idx = 1 #Sample that after weights represent data
+data_idx = 0 #Sample that after weights represent data
 data_name = mc_names[data_idx]
 
-mc_ref = mc_names[data_idx-1]
+mc_ref = mc_names[data_idx-1] #MC ref is used to define the reference simulation used to derive the closure and model systematic uncertainties
 print(mc_ref)
 folder = 'results'
 
@@ -50,12 +52,12 @@ if flags.closure:
 
 gen_var_names = {
     #'jet_pt': r"$p_\mathrm{T}^\mathrm{jet}$",
-    'genjet_eta':r'$\eta^\mathrm{jet}$',
-    'gen_Q2': r"$Q^2$",
-    'genjet_pt': r"$p_\mathrm{T}^\mathrm{jet}$",
+    # 'genjet_eta':r'$\eta^\mathrm{jet}$',
+    # 'gen_Q2': r"$Q^2$",
+    # 'genjet_pt': r"$p_\mathrm{T}^\mathrm{jet}$",
     # 'genjet_phi':r'$\phi^\mathrm{jet}$',
     'gen_jet_ncharged':r'$\mathrm{N_{c}}$', 
-    'gen_jet_charge':r'$\mathrm{Q_j}$', 
+    'gen_jet_charge':r'$\mathrm{Q_1}$', 
     'gen_jet_ptD':r'$p_\mathrm{T}\mathrm{D}$',
     'gen_jet_tau10':r'$\mathrm{log}(\tau_{1})$', 
     'gen_jet_tau15':r'$\mathrm{log}(\tau_{0.5})$',
@@ -74,7 +76,7 @@ def RatioLabel(ax1):
     ax1.axhline(y=0.0, color='r', linestyle='-')
     # ax1.axhline(y=10, color='r', linestyle='--')
     # ax1.axhline(y=-10, color='r', linestyle='--')
-    ax1.set_ylim([-30,30])
+    ax1.set_ylim([-70,70])
     
 
 def PlotUnc(xaxis,values,xlabel='',add_text=''):
@@ -146,6 +148,7 @@ for mc_name in mc_names:
                     ) for nstrap in range(1,config['NBOOTSTRAP']+1)]
                 
     elif flags.sys:
+        pass
         base_name = "Omnifold_{}".format(flags.mode)
         model_name = '{}/{}_{}_iter{}_step2.h5'.format(flags.weights,base_name,mc_name,flags.niter)
         sys_variations['model'] = mc_info[mc_name].ReturnWeights(
@@ -178,8 +181,10 @@ for var in gen_var_names:
         
     ratios = {}
     max_y = max(data_pred)
-    ax0.set_ylim(top=1.5*max_y)
-    
+    ax0.set_ylim(top=1.8*max_y)
+    #######################################
+    # Processing systematic uncertainties #
+    #######################################
     if flags.sys == True:
         ratio_sys = {}
         total_sys = np.ones(len(binning)-1)
@@ -237,17 +242,23 @@ for var in gen_var_names:
         opt.WriteText(xpos=0.25,ypos=1.03,text = text_q2,ax0=ax0)
         
         plt.text(0.15, 0.87,'$0.2<y<0.7$ \n $p_\mathrm{T}^\mathrm{jet}>10$ GeV  \n $k_\mathrm{T}, R=1.0$',
-         horizontalalignment='center',
-         verticalalignment='center',
-         transform = ax0.transAxes, fontsize=20)
+                 horizontalalignment='center',
+                 verticalalignment='center',
+                 transform = ax0.transAxes, fontsize=20)
         
     else:
         plt.text(0.15, 0.77,'$Q^{2}>$150 GeV$^{2}$ \n $0.2<y<0.7$ \n $p_\mathrm{T}^\mathrm{jet}>10$ GeV  \n $k_\mathrm{T}, R=1.0$',
-         horizontalalignment='center',
-         verticalalignment='center',
-         transform = ax0.transAxes, fontsize=20)
+                 horizontalalignment='center',
+                 verticalalignment='center',
+                 transform = ax0.transAxes, fontsize=20)
         
     ax0.tick_params(axis='x',labelsize=0)
+
+
+    ################################
+    # Processing other predictions #
+    ################################
+
     
     for mc_name in mc_names:
         #Upper canvas
@@ -258,11 +269,21 @@ for var in gen_var_names:
         ax0.plot(xaxis,pred,color=opt.colors[mc],marker=opt.markers[mc],ms=12,lw=0,markerfacecolor='none',markeredgewidth=3,label=mc)
         ratios[mc] = 100*np.divide(pred-data_pred,data_pred)        
         #Ratio plot    
-        mc = mc_name.split("_")[0]
         ax1.plot(xaxis,ratios[mc],color=opt.colors[mc],marker=opt.markers[mc],ms=12,lw=0,markerfacecolor='none',markeredgewidth=3)
+        
+    for mc_name in standalone_predictions:
+        #process additional theory samples already stored as histograms
+        pred = opt.LoadFromROOT(os.path.join("../rivet","{}.root".format(mc_name)),var,flags.q2_int)
+        if len(pred)>len(xaxis):
+            pred=pred[:len(xaxis)] #In case less bins are used
+        ax0.plot(xaxis,pred,color=opt.colors[mc_name],marker=opt.markers[mc_name],
+                 ms=12,lw=0,markerfacecolor='none',markeredgewidth=3,label=opt.name_translate[mc_name])
+        ratios[mc_name] = 100*np.divide(pred-data_pred,data_pred)
+        #Ratio plot    
+        ax1.plot(xaxis,ratios[mc_name],color=opt.colors[mc_name],marker=opt.markers[mc_name],
+                 ms=12,lw=0,markerfacecolor='none',markeredgewidth=3)
 
-
-    ax0.legend(loc='best',fontsize=16,ncol=1)    
+    ax0.legend(loc='best',fontsize=16,ncol=2)    
     RatioLabel(ax1)
     
     plot_folder = '../plots_'+data_name
