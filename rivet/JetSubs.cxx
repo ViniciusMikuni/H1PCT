@@ -62,7 +62,7 @@ int main( int argc, char* argv[]) {
 
   // Beam energies, minimal Q2, number of events to generate.
   int Q2min     = 150;
-  int    nEvent    = 100000; // dire: 10000 evt ~ 1min, 100000~4min
+  int    nEvent    = 5000000; // dire: 10000 evt ~ 1min, 100000~4min
   //int    nEvent    = 100000; // dire: 10000 evt ~ 1min, 100000~4min
  
   // Generator. Shorthand for event.
@@ -162,7 +162,7 @@ int main( int argc, char* argv[]) {
 
 
 
-  pythia.readString("HadronLevel:Hadronize = on"); // hadron-level on/off
+  pythia.readString("HadronLevel:Hadronize = off"); // hadron-level on/off
   pythia.readString("PartonLevel:FSR = on");
   //pythia.readString("WeakBosonAndParton:all  = on");
   //pythia.readString("HardQCD:all = on");
@@ -184,6 +184,11 @@ int main( int argc, char* argv[]) {
   // Histograms.
   cout << "before histograms" << endl;
   Double_t Q2_binning[5] {150.,360.42171212,866.02540378,2080.89572514,5000.};
+  // TTree *tree = new TTree("Tree","Tree");
+  Double_t eta;
+  Double_t q2;
+  // tree->Branch("eta",&eta,"eta/D");
+  // tree->Branch("q2",&q2,"q2/D");
 
   //Q2 binned observables
   Double_t pt150_binning[7] {10, 16.050000953674196, 24.07000095367545, 32.80000095367653, 43.14000095367447, 57.160000953671684, 105.12264};
@@ -191,7 +196,7 @@ int main( int argc, char* argv[]) {
   Double_t pt346_binning[9] {10, 21.190002861023633, 36.510002861024425, 58.74000286102, 71.57000286102283, 84.46000286102942, 99.16000286103694, 117.95000286104656, 143.86293};
   Double_t eta150_binning[7] {-1, -0.5218995231628945, -0.2855995231629205, -0.042099523162935776, 0.2636004768370517, 0.7280004768370005, 2.4999971};
   Double_t eta237_binning[9] {-1, -0.4987999403954104, -0.2892999403954335, -0.10419994039545098, 0.07640005960455212, 0.2666000596045379, 0.46590005960451597, 0.7634000596044832, 2.4999995};
-  Double_t eta346_binning[7] {-1, -0.11549982118616176, 0.1602001788138392, 0.40660017881381205, 0.6466001788137856, 1.0048001788137462, 2.4999936};
+  Float_t eta346_binning[] = {-1,-0.11549982118616176, 0.1602001788138392, 0.40660017881381205, 0.6466001788137856, 1.0048001788137462, 2.4999936};
   Double_t phi150_binning[7] {0, 0.14950005215406403, 0.558100052154019, 0.8652000521539852, 1.1659000521539522, 1.5232000521539129, 1.570620059967041};
   Double_t phi237_binning[9] {0, 0.09770005960464655, 0.3703000596046203, 0.5800000596045972, 0.8009000596045729, 1.01040005960455, 1.2351000596045252, 1.473000059604499, 1.5705121755599976};
   Double_t phi346_binning[9] {0.0, 0.06160000000000074, 0.3050999999999827, 0.5131999999999598, 0.728899999999936, 0.9413999999999126, 1.156699999999889, 1.3817999999998642, 1.5706232786178589};
@@ -237,6 +242,7 @@ int main( int argc, char* argv[]) {
 
   TH1D* Q2_150_jetpt = new TH1D("Q2_150_jetpt","Q2_150_jetpt",6,pt150_binning);
   TH1D* Q2_150_jeteta = new TH1D("Q2_150_jeteta","Q2_150_jeteta",6,eta150_binning);
+  //TH1D* Q2_150_jeteta = new TH1D("Q2_150_jeteta","Q2_150_jeteta",5,-1,2.5);
   TH1D* Q2_150_jetdphi = new TH1D("Q2_150_jetdphi","Q2_150_jetdphi",6,phi150_binning);
   TH1D* Q2_150_jetqt = new TH1D("Q2_150_qt","Q2_150_qt",7,qt150_binning);
 
@@ -246,7 +252,10 @@ int main( int argc, char* argv[]) {
   TH1D* Q2_237_jetqt = new TH1D("Q2_237_qt","Q2_237_qt",8,qt237_binning);
 
   TH1D* Q2_346_jetpt = new TH1D("Q2_346_jetpt","Q2_346_jetpt",8,pt346_binning);
-  TH1D* Q2_346_jeteta = new TH1D("Q2_346_jeteta","Q2_346_jeteta",6,eta346_binning);
+  Int_t  binnum = sizeof(eta346_binning)/sizeof(Float_t) - 1;
+  TH1F* Q2_346_jeteta = new TH1F("Q2_346_jeteta","Q2_346_jeteta",binnum,eta346_binning);
+
+  //TH1D* Q2_346_jeteta = new TH1D("Q2_346_jeteta","Q2_346_jeteta",10,-1,2.5);
   TH1D* Q2_346_jetdphi = new TH1D("Q2_346_jetdphi","Q2_346_jetdphi",8,phi346_binning);
   TH1D* Q2_346_jetqt = new TH1D("Q2_346_qt","Q2_346_qt",5,qt346_binning);
 
@@ -334,13 +343,18 @@ int main( int argc, char* argv[]) {
     vector<PseudoJet> particlelist;
     TLorentzVector jet_vec;
     //cout << "event size (including mothers) is " << event.size() << endl;
-    for (int i = 7; i < event.size(); ++i) {  // we start from: i>6
-      if (i!= idelec && event[i].isFinal() && event[i].isHadron() && !event[i].isParton()){
+    for (int i = 0; i < event.size(); ++i) {  // we start from: i>6
+      if (event[i].isFinal()){
+	if (event[i].idAbs() == 12 || event[i].idAbs() == 14 ||
+	    event[i].idAbs() == 16)     continue;
+	if(pythia.event[i].idAbs() ==11) continue;
+	if ( !event[i].isVisible()  ) continue;
+	if ( event[i].mother1()==6 ) continue; //remove scattered lepton 
 	Vec4 part4vect = event[i].p();
 	fastjet::PseudoJet gen_particle(part4vect.px(),part4vect.py(),part4vect.pz(),part4vect.e());
 	gen_particle.set_user_index(event[i].charge());      
 	part4v.SetPxPyPzE(part4vect.px(),part4vect.py(),part4vect.pz(),part4vect.e());
-	if (part4v.Eta()<2.75){
+	if (part4v.Eta()<5 && part4v.Pt()>0.1){
 	  particlelist.push_back(gen_particle);
 	}
 
@@ -351,7 +365,10 @@ int main( int argc, char* argv[]) {
 
     // End of particle loop.
     if (( Y > 0.2 && Y<0.7) && peOut.e() > 11  && Q2>150) {
-      fastjet::JetDefinition jet_def(fastjet::kt_algorithm, 1.0);
+      fastjet::RecombinationScheme    recombScheme = fastjet::E_scheme;
+      fastjet::Strategy               strategy = fastjet::Best;
+      fastjet::JetDefinition jet_def(fastjet::kt_algorithm, 1.0,recombScheme, strategy);
+      
       ClusterSequence clust_seq_lab(particlelist, jet_def);
       vector<PseudoJet> jets_lab = clust_seq_lab.inclusive_jets(10.0);
       vector<PseudoJet> sortedLabJets = sorted_by_pt(jets_lab);
@@ -390,7 +407,10 @@ int main( int argc, char* argv[]) {
 	  Q2_346_jetpt->Fill(jet.perp());
 	  Q2_346_jeteta->Fill(jet.eta());
 	  Q2_346_jetdphi->Fill(dphi);
-	  Q2_346_jetqt->Fill(qt/sqrt(Q2));
+	  Q2_346_jetqt->Fill(qt/sqrt(Q2));	  
+	  q2 = Q2;
+	  eta = jet.eta();
+	  //tree->Fill();
 	}
 
 	if (Y>0.2 && Y<0.31){
@@ -411,8 +431,6 @@ int main( int argc, char* argv[]) {
 	  y_44_jetdphi->Fill(dphi);
 	  y_44_jetqt->Fill(qt/sqrt(Q2));
 	}
-	
-
 	for (unsigned j = 0; j < constituents.size(); j++) {
 	  TVector3 hvector(constituents[j].px(), constituents[j].py(), constituents[j].pz());
 	  TLorentzVector constituent(hvector,0);
@@ -479,7 +497,7 @@ int main( int argc, char* argv[]) {
   cout<<"Total cross section:   "<<xstotPS<<endl;
   cout<<"Total cross section 2: "<< htot.GetBinContent(1)  / naccptd * sigmaGen <<endl;
 
-
+  //tree->Write();
   Q2_hist->Write();
   ncharge_hist->Write();
   charge_hist->Write();
@@ -501,58 +519,58 @@ int main( int argc, char* argv[]) {
 
 
 
-  Q2_150_jetpt->Scale(1.0/Q2_150_jetpt->Integral("width"));
+  Q2_150_jetpt->Scale(1.0/Q2_150_jetpt->Integral(),"width");
   Q2_150_jetpt->Write();
-  Q2_150_jeteta->Scale(1.0/Q2_150_jeteta->Integral("width"));
+  Q2_150_jeteta->Scale(1.0/Q2_150_jeteta->Integral(),"width");
   Q2_150_jeteta->Write();
-  Q2_150_jetdphi->Scale(1.0/Q2_150_jetdphi->Integral("width"));
+  Q2_150_jetdphi->Scale(1.0/Q2_150_jetdphi->Integral(),"width");
   Q2_150_jetdphi->Write();
-  Q2_150_jetqt->Scale(1.0/Q2_150_jetqt->Integral("width"));
+  Q2_150_jetqt->Scale(1.0/Q2_150_jetqt->Integral(),"width");
   Q2_150_jetqt->Write();
 
-  Q2_237_jetpt->Scale(1.0/Q2_237_jetpt->Integral("width"));
+  Q2_237_jetpt->Scale(1.0/Q2_237_jetpt->Integral(),"width");
   Q2_237_jetpt->Write();
-  Q2_237_jeteta->Scale(1.0/Q2_237_jeteta->Integral("width"));
+  Q2_237_jeteta->Scale(1.0/Q2_237_jeteta->Integral(),"width");
   Q2_237_jeteta->Write();
-  Q2_237_jetdphi->Scale(1.0/Q2_237_jetdphi->Integral("width"));
+  Q2_237_jetdphi->Scale(1.0/Q2_237_jetdphi->Integral(),"width");
   Q2_237_jetdphi->Write();
-  Q2_237_jetqt->Scale(1.0/Q2_237_jetqt->Integral("width"));
+  Q2_237_jetqt->Scale(1.0/Q2_237_jetqt->Integral(),"width");
   Q2_237_jetqt->Write();
 
-  Q2_346_jetpt->Scale(1.0/Q2_346_jetpt->Integral("width"));
+  Q2_346_jetpt->Scale(1.0/Q2_346_jetpt->Integral(),"width");
   Q2_346_jetpt->Write();
-  Q2_346_jeteta->Scale(1.0/Q2_346_jeteta->Integral("width"));
+  Q2_346_jeteta->Scale(1.0/Q2_346_jeteta->Integral(),"width");
   Q2_346_jeteta->Write();
-  Q2_346_jetdphi->Scale(1.0/Q2_346_jetdphi->Integral("width"));
+  Q2_346_jetdphi->Scale(1.0/Q2_346_jetdphi->Integral(),"width");
   Q2_346_jetdphi->Write();
-  Q2_346_jetqt->Scale(1.0/Q2_346_jetqt->Integral("width"));
+  Q2_346_jetqt->Scale(1.0/Q2_346_jetqt->Integral(),"width");
   Q2_346_jetqt->Write();
 
-  y_2_jetpt->Scale(1.0/y_2_jetpt->Integral("width"));
+  y_2_jetpt->Scale(1.0/y_2_jetpt->Integral(),"width");
   y_2_jetpt->Write();
-  y_2_jeteta->Scale(1.0/y_2_jeteta->Integral("width"));
+  y_2_jeteta->Scale(1.0/y_2_jeteta->Integral(),"width");
   y_2_jeteta->Write();
-  y_2_jetdphi->Scale(1.0/y_2_jetdphi->Integral("width"));
+  y_2_jetdphi->Scale(1.0/y_2_jetdphi->Integral(),"width");
   y_2_jetdphi->Write();
-  y_2_jetqt->Scale(1.0/y_2_jetqt->Integral("width"));
+  y_2_jetqt->Scale(1.0/y_2_jetqt->Integral(),"width");
   y_2_jetqt->Write();
 
-  y_31_jetpt->Scale(1.0/y_31_jetpt->Integral("width"));
+  y_31_jetpt->Scale(1.0/y_31_jetpt->Integral(),"width");
   y_31_jetpt->Write();
-  y_31_jeteta->Scale(1.0/y_31_jeteta->Integral("width"));
+  y_31_jeteta->Scale(1.0/y_31_jeteta->Integral(),"width");
   y_31_jeteta->Write();
-  y_31_jetdphi->Scale(1.0/y_31_jetdphi->Integral("width"));
+  y_31_jetdphi->Scale(1.0/y_31_jetdphi->Integral(),"width");
   y_31_jetdphi->Write();
-  y_31_jetqt->Scale(1.0/y_31_jetqt->Integral("width"));
+  y_31_jetqt->Scale(1.0/y_31_jetqt->Integral(),"width");
   y_31_jetqt->Write();
 
-  y_44_jetpt->Scale(1.0/y_44_jetpt->Integral("width"));
+  y_44_jetpt->Scale(1.0/y_44_jetpt->Integral(),"width");
   y_44_jetpt->Write();
-  y_44_jeteta->Scale(1.0/y_44_jeteta->Integral("width"));
+  y_44_jeteta->Scale(1.0/y_44_jeteta->Integral(),"width");
   y_44_jeteta->Write();
-  y_44_jetdphi->Scale(1.0/y_44_jetdphi->Integral("width"));
+  y_44_jetdphi->Scale(1.0/y_44_jetdphi->Integral(),"width");
   y_44_jetdphi->Write();
-  y_44_jetqt->Scale(1.0/y_44_jetqt->Integral("width"));
+  y_44_jetqt->Scale(1.0/y_44_jetqt->Integral(),"width");
   y_44_jetqt->Write();
 
 
