@@ -309,7 +309,9 @@ for var in gen_var_names:
     add_text = ''
     if flags.plot_reco:
         add_text = 'Detector level events \n'
-        #text_ypos += 0.01 
+        text_yshift = 0.03
+    else:
+        text_yshift = 0
     if flags.q2_int>0:
         gen_q2 = opt.dedicated_binning['gen_Q2']        
         text_q2 = "{} < $Q^2 < {} ~GeV^2$ \n".format(int(np.round(gen_q2[flags.q2_int-1],1)),int(np.round(gen_q2[flags.q2_int],1)))
@@ -317,7 +319,7 @@ for var in gen_var_names:
         # opt.WriteText(xpos=0.27,ypos=1.03,text = text_q2,ax0=ax0)
 
         
-        plt.text(text_xpos, text_ypos,text_fiducial,
+        plt.text(text_xpos, text_ypos+text_yshift,text_fiducial,
                  horizontalalignment='center',
                  verticalalignment='center',
                  transform = ax0.transAxes, fontsize=16)

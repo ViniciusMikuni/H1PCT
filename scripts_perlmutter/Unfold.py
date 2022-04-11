@@ -82,7 +82,7 @@ for mc_name in mc_names:
 
 
     if flags.closure:
-        ntest = int(10e6) #about same number of data events after reco selection
+        ntest = int(5e6) #about same number of data events after reco selection
         data_vars = np.concatenate([np.expand_dims(data[var][hvd.rank():ntest:hvd.size()],-1) for var in var_names],-1)
         weights_data = data['wgt'][hvd.rank():ntest:hvd.size()]
         pass_reco = data['pass_reco'][hvd.rank():ntest:hvd.size()] #pass reco selection
