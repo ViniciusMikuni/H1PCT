@@ -1,0 +1,196 @@
+// -*- C++ -*-
+
+#include "Rivet/Analysis.hh"
+#include "Rivet/Projections/FinalState.hh"
+#include "Rivet/Projections/FastJets.hh"
+#include "Rivet/Projections/DISKinematics.hh"
+#include "Rivet/Projections/DISFinalState.hh"
+namespace Rivet {
+  /// @brief Add a short analysis description here
+  class DIS_JetSubs : public Analysis {
+  public:
+    /// Constructor
+    RIVET_DEFAULT_ANALYSIS_CTOR(DIS_JetSubs);
+    /// Book histograms and initialise projections before the run
+    void init() {
+
+      // Initialise and register projections. Note that the definition
+      // of the scattered lepton can be influenced by sepcifying
+      // options as declared in the .info file.
+      DISLepton lepton(options());
+      declare(lepton, "Lepton");
+      declare(DISKinematics(lepton), "Kinematics");
+      declare(FinalState(), "FS");
+      const DISFinalState& disfs = declare(DISFinalState(DISFinalState::BoostFrame::LAB), "DISFS");
+
+      FastJets jetfs(disfs, FastJets::KT, 1.0, JetAlg::Muons::NONE, JetAlg::Invisibles::NONE);
+      declare(jetfs, "jets");
+
+      // Book histograms
+	
+      book(_hist_Q2, "Q2",logspace(10,0.1, 1000.0));
+      book(_hist_y, "y",10,0.,1.);
+      book(_hist_x, "xBj",logspace(10,0.00001, 1.0));
+      book(_hist_ept, "ept", logspace(6,10,100));
+      book(_hist_jetpt, "jetpt", logspace(6,10,100));
+      book(_hist_jeteta, "jeteta", 5,-1.0,2.5);
+      book(_hist_qt, "jetqt", {0. ,        0.06510462, 0.13933307, 0.27149627, 0.50681187 ,0.92578957,   1.67177624, 3.  });
+      _inclusive_xs=0.0;
+      book(_hist_dphi, "jetpdhi", {0.     ,    0.05069951, 0.10235664, 0.18708038, 0.32603721 ,0.55394268,	    0.92773432, 1.54079633});
+
+    }
+
+
+    /// Perform the per-event analysis
+    void analyze(const Event& event) {
+      // Get the DIS kinematics
+      const DISKinematics& dk = apply<DISKinematics>(event, "Kinematics");
+      if ( dk.failed() ) return;
+      double x  = dk.x();
+      double y  = dk.y();
+      double Q2 = dk.Q2();
+
+      if (Q2 < 150.0*GeV2) vetoEvent;
+      if ( y>0.7) vetoEvent;
+      if(y<0.2) vetoEvent;
+      
+      // Weight of the event
+      _hist_Q2->fill(Q2);
+      _hist_y->fill(y);
+      _hist_x->fill(x);
+
+      // Momentum of the scattered lepton
+      const DISLepton& dl = apply<DISLepton>(event,"Lepton");
+      if ( dl.failed() ) return;
+      const FourMomentum leptonMom = dl.out();
+      const double ptel = leptonMom.pT();
+      const double enel = leptonMom.E();
+
+      if(enel<11*GeV) vetoEvent;
+      
+      const double thel = leptonMom.angle(dk.beamHadron().mom())/degree;
+      _hist_ept->fill(ptel);
+
+
+       // Extract the particles other than the lepton
+      const FinalState& fs = apply<FinalState>(event, "FS");
+      Particles particles;
+      particles.reserve(fs.particles().size());
+      ConstGenParticlePtr dislepGP = dl.out().genParticle();
+      for(const Particle& p: fs.particles()) {
+        ConstGenParticlePtr loopGP = p.genParticle();
+        if (loopGP == dislepGP) continue;
+        particles.push_back(p);
+      }
+
+      
+       // Retrieve clustered jets, sorted by pT, with a minimum pT cut
+      //float qt = 0;
+      Jets jets = apply<FastJets>(event, "jets").jetsByPt(Cuts::pT > 10*GeV && Cuts::eta < 2.5 && Cuts::eta>-1.0);  
+      for (int i = 0; i < jets.size(); ++i){
+	  _inclusive_xs = _inclusive_xs + 1;
+	  FourMomentum jetmom = jets[i].momentum();
+          _hist_jetpt->fill(jets[i].pT()/GeV);
+	  _hist_jeteta->fill(jets[i].eta());
+	  float qt = sqrt( (jetmom.px() + leptonMom.px() )/GeV*(jetmom.px() + leptonMom.px() )/GeV  + (jetmom.py() + leptonMom.py() )/GeV*(jetmom.py() + leptonMom.py() )/GeV           )           ;
+	  _hist_qt->fill(qt/sqrt(Q2));
+          float dphi = 3.14159265359- mapAngle0ToPi(leptonMom.phi()-jets[i].phi());
+	  _hist_dphi->fill(dphi);
+      }
+      
+    }
+
+
+    /// Normalise histograms etc., after the run
+    void finalize() {
+
+      //scale(_hist_Q2, 1.0/(_inclusive_xs)); // normalize to unity
+      ///normalize(_hist_y); // normalize to unity
+      //normalize(_hist_ept);
+      //scale(_hist_jetpt, 1.0/(_inclusive_xs));
+      //normalize(_hist_jeteta);
+      //scale(_hist_qt, 1.0/(_inclusive_xs));
+    }
+
+    //@}
+
+
+    /// The histograms.
+    Histo1DPtr _hist_Q2, _hist_y, _hist_x, _hist_ept, _hist_jetpt, _hist_qt, _hist_jeteta, _hist_dphi;
+    double _inclusive_xs;
+
+  };
+
+
+  // The hook for the plugin system
+  //DECLARE_RIVET_PLUGIN(leptonjet);
+  RIVET_DECLARE_PLUGIN(DIS_JetSubs);
+
+}
+    
+
+    /// @name Analysis methods
+    //@{
+
+    /// Book histograms and initialise projections before the run
+//   void init() {
+
+      // Initialise and register projections
+
+      // The basic final-state projection:
+      // all final-state particles within
+      // the given eta acceptance
+//    const FinalState fs(Cuts::abseta < 4.9);
+
+      // The final-state particles declared above are clustered using FastJet with
+      // the anti-kT algorithm and a jet-radius parameter 0.4
+      // muons and neutrinos are excluded from the clustering
+//    FastJets jetfs(fs, FastJets::KT, 1.0, JetAlg::Muons::NONE, JetAlg::Invisibles::NONE);
+//     declare(jetfs, "jets");
+
+
+      // specify custom binning
+//    book(_h["XXXX"], "myh1", 20, 0.0, 100.0);
+//     book(_h["YYYY"], "myh2", logspace(20, 1e-2, 1e3));
+//     book(_h["ZZZZ"], "myh3", {0.0, 1.0, 2.0, 4.0, 8.0, 16.0})//;
+
+//    }
+
+
+    /// Perform the per-event analysis
+//  void analyze(const Event& event) {
+
+      // Retrieve clustered jets, sorted by pT, with a minimum pT cut
+//    Jets jets = apply<FastJets>(event, "jets").jetsByPt(Cuts::pT > 30*GeV);
+
+      // Fill histogram with leading b-jet pT
+//    _h["XXXX"]->fill(jets[0].pT()/GeV);
+
+//  }
+
+
+    /// Normalise histograms etc., after the run
+//  void finalize() {
+
+      //normalize(_h["YYYY"]); // normalize to unity
+//    scale(_h["XXXX"], crossSection()/picobarn/sumOfWeights()); // norm to cross section
+
+//  }
+
+    //@}
+
+
+    /// @name Histograms
+    //@{
+//  map<string, Histo1DPtr> _h;
+//   map<string, Profile1DPtr> _p;
+//   map<string, CounterPtr> _c;
+    //@}
+
+
+// };
+
+
+//DECLARE_RIVET_PLUGIN(leptonjet);
+
+//}

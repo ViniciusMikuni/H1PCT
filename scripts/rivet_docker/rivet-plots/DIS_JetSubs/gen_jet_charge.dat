@@ -1,0 +1,25 @@
+# BEGIN PLOT
+LegendOnly=//global/u2/v/vmikuni/H1/H1PCT/scripts/rivet_docker/Rivet.yoda/DIS_JetSubs/gen_jet_charge
+DrawOnly=//global/u2/v/vmikuni/H1/H1PCT/scripts/rivet_docker/Rivet.yoda/DIS_JetSubs/gen_jet_charge
+Legend=1
+LogY=1
+# END PLOT
+
+# BEGIN HISTO1D //global/u2/v/vmikuni/H1/H1PCT/scripts/rivet_docker/Rivet.yoda/DIS_JetSubs/gen_jet_charge
+LineColor=red
+LineStyle=solid
+Path=//global/u2/v/vmikuni/H1/H1PCT/scripts/rivet_docker/Rivet.yoda/DIS_JetSubs/gen_jet_charge
+ScaledBy=1.00000000000000000e+00
+Title=Rivet
+# xlow	 xhigh	 val	 errminus	 errplus
+-8.000000e-01	-6.222222e-01	1.631250e+02	3.029155e+01	3.029155e+01
+-6.222222e-01	-4.444444e-01	4.106249e+02	4.806002e+01	4.806002e+01
+-4.444444e-01	-2.666667e-01	9.056254e+02	7.137328e+01	7.137328e+01
+-2.666667e-01	-8.888889e-02	1.676250e+03	9.710254e+01	9.710254e+01
+-8.888889e-02	8.888889e-02	2.503125e+03	1.186595e+02	1.186595e+02
+8.888889e-02	2.666667e-01	2.126250e+03	1.093625e+02	1.093625e+02
+2.666667e-01	4.444444e-01	1.215001e+03	8.267031e+01	8.267031e+01
+4.444444e-01	6.222222e-01	5.006249e+02	5.306614e+01	5.306614e+01
+6.222222e-01	8.000000e-01	1.912500e+02	3.279910e+01	3.279910e+01
+# END HISTO1D
+

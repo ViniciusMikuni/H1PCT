@@ -1,0 +1,23 @@
+# BEGIN PLOT
+LegendOnly=//global/u2/v/vmikuni/H1/H1PCT/scripts/rivet_docker/Rivet.yoda/DIS_JetSubs/gen_jet_tau10
+DrawOnly=//global/u2/v/vmikuni/H1/H1PCT/scripts/rivet_docker/Rivet.yoda/DIS_JetSubs/gen_jet_tau10
+Legend=1
+LogY=1
+# END PLOT
+
+# BEGIN HISTO1D //global/u2/v/vmikuni/H1/H1PCT/scripts/rivet_docker/Rivet.yoda/DIS_JetSubs/gen_jet_tau10
+LineColor=red
+LineStyle=solid
+Path=//global/u2/v/vmikuni/H1/H1PCT/scripts/rivet_docker/Rivet.yoda/DIS_JetSubs/gen_jet_tau10
+ScaledBy=1.00000000000000000e+00
+Title=Rivet
+# xlow	 xhigh	 val	 errminus	 errplus
+-2.200000e+00	-2.028571e+00	7.874980e+02	6.777704e+01	6.777704e+01
+-2.028571e+00	-1.857143e+00	1.044170e+03	7.804494e+01	7.804494e+01
+-1.857143e+00	-1.685714e+00	1.137497e+03	8.145786e+01	8.145786e+01
+-1.685714e+00	-1.514286e+00	1.335838e+03	8.827465e+01	8.827465e+01
+-1.514286e+00	-1.342857e+00	1.294997e+03	8.691449e+01	8.691449e+01
+-1.342857e+00	-1.171429e+00	1.096670e+03	7.998290e+01	7.998290e+01
+-1.171429e+00	-1.000000e+00	8.399979e+02	6.999983e+01	6.999983e+01
+# END HISTO1D
+
