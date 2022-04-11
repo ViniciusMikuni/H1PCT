@@ -19,28 +19,32 @@ if gpus:
 
 
 class MCInfo():
-    def __init__(self,mc_name,N,data_folder,config,q2_int=0,use_mask=True):
-        self.N = N
+    def __init__(self,mc_name,N,data_folder,config,q2_int=0,is_reco=False):
+        self.N = int(N)
         self.file = h5.File(os.path.join(data_folder,"{}.h5".format(mc_name)),'r')
-        self.use_mask = use_mask
+        self.is_reco = is_reco
         self.config = config
-        self.truth_mask = self.file['pass_truth'][:self.N] #pass truth region definition
-        
-        if self.use_mask:
-            self.mask = self.file['pass_fiducial'][:self.N] == 1 #pass fiducial region definition
-            if q2_int>0:
-                gen_q2 = opt.dedicated_binning['gen_Q2']
-                self.mask *= ((self.file['gen_Q2'][:self.N] > gen_q2[q2_int-1]) & (self.file['gen_Q2'][:self.N] < gen_q2[q2_int]))
-                #self.fiducial_mask *= np.sum(self.file['gen_jet_part_pt'][:self.N] > 0,-1) < 20        
-            self.nominal_wgts = self.file['wgt'][:self.N][self.mask]
+
+        if not self.is_reco:
+            self.truth_mask = self.file['pass_truth'][:self.N] #pass truth region definition
+            particle_mask = np.sum(self.file['gen_jet_part_pt'][:self.N] > 0,-1) > 1
+            self.mask = (self.truth_mask==1)&(self.file['pass_fiducial'][:self.N] == 1) #pass fiducial region definition
+            #self.mask = (self.mask) * (particle_mask)
+            q2_name = 'gen_Q2'
         else:
-            self.nominal_wgts = self.file['wgt'][:self.N]
+            self.mask = self.file['pass_reco'][:self.N] == 1 #pass fiducial region definition
+            q2_name = 'Q2'
+            
+        if q2_int>0:
+            gen_q2 = opt.dedicated_binning[q2_name]
+            self.mask *= ((self.file[q2_name][:self.N] > gen_q2[q2_int-1]) & (self.file[q2_name][:self.N] < gen_q2[q2_int]))
+            #self.fiducial_mask *= np.sum(self.file['gen_jet_part_pt'][:self.N] > 0,-1) < 20        
+        self.nominal_wgts = self.file['wgt'][:self.N][self.mask]
             
     def LoadVar(self,var):
-        if self.use_mask:
-            return_var = self.file[var][:self.N][self.mask]
-        else:
-            return_var = self.file[var][:self.N]
+
+        return_var = self.file[var][:self.N][self.mask]
+        
         if 'tau' in var:
             return_var = np.ma.log(return_var).filled(0)
         return return_var
@@ -63,7 +67,7 @@ class MCInfo():
             global_names = self.config['GLOBAL_GEN']
             global_vars = np.concatenate([np.expand_dims(self.file[var][:self.N],-1) for var in global_names],-1)
             mean,std = Scaler(self.file,global_names)
-            global_vars[self.truth_mask==1] = (global_vars[self.truth_mask==1] - mean)/std
+            global_vars = (global_vars - mean)/std
 
         else:
             var_names = self.config['VAR_MLP_GEN']
@@ -78,7 +82,7 @@ class MCInfo():
         
         if mode != "PCT":
             mean,std = Scaler(self.file,var_names)
-            data[self.truth_mask==1]=(data[self.truth_mask==1]-mean)/std
+            data=(data-mean)/std
             mfold.mc_gen = data
         else:
             mfold.mc_gen = [data,global_vars]
@@ -88,16 +92,12 @@ class MCInfo():
 
     def Reweight(self,mfold,model_name):
         mfold.model2.load_weights(model_name)
-        if self.use_mask:
-            return mfold.reweight(mfold.mc_gen,mfold.model2)[self.mask]
-        else:
-            return mfold.reweight(mfold.mc_gen,mfold.model2)
+        return mfold.reweight(mfold.mc_gen,mfold.model2)[self.mask]        
 
     def LoadTrainedWeights(self,file_name):
         h5file = h5.File(file_name,'r')
         weights = h5file['wgt'][:self.N]
-        if self.use_mask:
-            weights=weights[self.mask]
+        weights=weights[self.mask]
         return weights
         
             

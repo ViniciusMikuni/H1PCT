@@ -1,4 +1,5 @@
 from PIL import Image
+from PIL import ImageDraw,ImageFont
 import glob
 import os
 import argparse
@@ -22,15 +23,26 @@ plot_list = {
     'gen_jet_ncharged_6':r'$\mathrm{N_{c}}$', 
     'gen_jet_charge_6':r'$\mathrm{Q_1}$', 
     'gen_jet_ptD_6':r'$p_\mathrm{T}\mathrm{D}$',
-    'gen_jet_tau10_6':r'$\mathrm{log}(\tau_{1})$', 
-    'gen_jet_tau15_6':r'$\mathrm{log}(\tau_{0.5})$',
-    'gen_jet_tau20_6':r'$\mathrm{log}(\tau_{0})$'}
+    'gen_jet_tau10_6':r'$\mathrm{log}(\lambda_1^1)$', 
+    'gen_jet_tau15_6':r'$\mathrm{log}(\lambda_{1.5}^1)$',
+    'gen_jet_tau20_6':r'$\mathrm{log}(\lambda_2^1)$',
+    
+    # 'gen_jet_ncharged':r'$\mathrm{N_{c}}$', 
+    # 'gen_jet_charge':r'$\mathrm{Q_1}$', 
+    # 'gen_jet_ptD':r'$p_\mathrm{T}\mathrm{D}$',
+    # 'gen_jet_tau10':r'$\mathrm{log}(\lambda_1^1)$', 
+    # 'gen_jet_tau15':r'$\mathrm{log}(\lambda_{1.5}^1)$',
+    # 'gen_jet_tau20':r'$\mathrm{log}(\lambda_2^1)$',
+}
 
-
+#font = ImageFont.load_default(size=25)
+font = ImageFont.truetype("Helvetica-Bold.ttf", size=35)
 for to_gif in plot_list:
     frames = []
     for i in range(1,flags.niter+1):
         new_frame = Image.open(os.path.join(base_folder,"{}_{}.png".format(to_gif,i)))
+        # draw = ImageDraw.Draw(new_frame)
+        # draw.text((120, 75), "Iteration {}".format(i),fill="black",font=font)
         frames.append(new_frame)
  
     # Save into a GIF file that loops forever

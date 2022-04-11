@@ -15,6 +15,7 @@ colors = {
     'Djangoh':'#8c564b',
     'Rapgap':'darkorange',
     'Herwig':'crimson',
+    'Herwig_Matchbox':'crimson',
     'Cascade':'b',
     
     'PCT': 'g',    
@@ -24,17 +25,27 @@ colors = {
 
 
 markers = {
-    'Djangoh':'D',
+    'Djangoh':'P',
     'Rapgap':'X',
 
     'Pythia': '^',
     'Pythia_Vincia': '<',
     'Pythia_Dire': '>',
-    'Herwig':'P',
+    'Herwig':'D',
+    'Herwig_Matchbox':'d',
     'PCT':'P',
     'standard':'o',
     'hybrid':'x',
 }
+
+xaxis_disp = {
+    'Pythia': 0.0,
+    'Pythia_Vincia': 0.3,
+    'Pythia_Dire': 0.6,
+    'Herwig':-0.3,
+    'Herwig_Matchbox':-0.6,
+}
+    
 
 dedicated_binning = {
     'gen_jet_ncharged':np.linspace(1,15-1e-8,15), 
@@ -46,21 +57,35 @@ dedicated_binning = {
     'gen_jet_tau10':np.linspace(-2.2,-1,8),
     'gen_jet_tau15':np.linspace(-3,-1.2,8),
     'gen_jet_tau20':np.linspace(-3.5,-1.5,8),
-
-    # 'gen_jet_tau10':np.linspace(0,0.2,10),
-    # 'gen_jet_tau15':np.linspace(0,0.2,10),
-    # 'gen_jet_tau20':np.linspace(0,0.2,10),
-
     'gen_jet_ptD':np.linspace(0.3,0.7,10),
     'gen_Q2':np.logspace(np.log10(150),np.log10(5000), 5),
+
+    'jet_ncharged':np.linspace(1,15-1e-8,15), 
+    'jet_charge':np.linspace(-0.8,0.8,10),    
+    'jet_tau10':np.linspace(-2.2,-1,8),
+    'jet_tau15':np.linspace(-3,-1.2,8),
+    'jet_tau20':np.linspace(-3.5,-1.5,8),
+    'jet_ptD':np.linspace(0.3,0.7,10),
+    'Q2':np.logspace(np.log10(150),np.log10(5000), 5),
 }
 
+fixed_yaxis = {
+    'gen_jet_ncharged':0.45, 
+    'gen_jet_charge':4.5,
+    'gen_jet_tau10':3,
+    'gen_jet_tau15':2,
+    'gen_jet_tau20':2,
+    'gen_jet_ptD':12.5,
+
+    }
+
 sys_sources = {
-    # 'sys_0':'#66c2a5',
-    # 'sys_1':'#fc8d62',
-    # 'sys_5':'#a6d854',
-    # 'sys_7':'#ffd92f',
-    # 'sys_11':'#8da0cb',
+    'sys_0':'#66c2a5',
+    'sys_1':'#fc8d62',
+    'sys_5':'#a6d854',
+    'sys_7':'#ffd92f',
+    'sys_11':'#8da0cb',
+    'QED': '#8c564b',
     'model':'#e78ac3',
     'closure': '#e5c494',
     'stat':'#808000'
@@ -74,18 +99,37 @@ sys_translate = {
     'sys_7':"Lepton energy scale",
     'sys_11':"Lepton $\phi$ angle",
     'model': 'Model',
+    'QED':'QED correction',
     'closure': 'Non-closure',
     'stat':'Stat.',
 }
 
 name_translate = {
     'Herwig': "Herwig",
+    'Herwig_Matchbox': "Herwig + Matchbox",
     'Pythia': 'Pythia',
     'Pythia_Vincia':'Pythia + Vincia',
     'Pythia_Dire':'Pythia + Dire',
 
 }
 
+reco_vars = {
+    'jet_ncharged':r'Charged hadron multiplicity', 
+    'jet_charge':r'Jet Charge', 
+    'jet_ptD':r'$p_\mathrm{T}\mathrm{D}$',
+    'jet_tau10':r'$\mathrm{log}(\lambda_1^1)$', 
+    'jet_tau15':r'$\mathrm{log}(\lambda_{1.5}^1)$',
+    'jet_tau20':r'$\mathrm{log}(\lambda_2^1)$',
+}
+
+gen_vars = {
+    'gen_jet_ncharged':r'Charged hadron multiplicity', 
+    'gen_jet_charge':r'Jet Charge', 
+    'gen_jet_ptD':r'$p_\mathrm{T}\mathrm{D}$',
+    'gen_jet_tau10':r'$\mathrm{log}(\lambda_1^1)$', 
+    'gen_jet_tau15':r'$\mathrm{log}(\lambda_{1.5}^1)$',
+    'gen_jet_tau20':r'$\mathrm{log}(\lambda_2^1)$',
+}
 
 # dedicated_binning = {
 #     'gen_jet_ncharged':np.linspace(1,15,14),
@@ -122,10 +166,11 @@ def LoadFromROOT(file_name,var_name,q2_bin=0):
         else: #2D slice of histogram
             var =  hist[var_name+"2D"].numpy()[0][:,q2_bin-1]
             bins = hist[var_name+"2D"].numpy()[1][0][0]
+            
         norm = 0
         for iv, val in enumerate(var):
             norm += val*abs(bins[iv+1]-bins[iv])
-        return var/norm
+        return var
         
 def SetStyle():
     from matplotlib import rc
@@ -152,10 +197,13 @@ def SetStyle():
     hep.set_style(hep.style.CMS)
     hep.style.use("CMS") 
 
-def SetGrid(ratio=True):
+def SetGrid(npanels=2):
     fig = plt.figure(figsize=(9, 9))
-    if ratio:
+    if npanels ==2:
         gs = gridspec.GridSpec(2, 1, height_ratios=[3,1]) 
+        gs.update(wspace=0.025, hspace=0.1)
+    elif npanels ==3:
+        gs = gridspec.GridSpec(3, 1, height_ratios=[3,1,1]) 
         gs.update(wspace=0.025, hspace=0.1)
     else:
         gs = gridspec.GridSpec(1, 1)
@@ -170,8 +218,10 @@ def FormatFig(xlabel,ylabel,ax0):
     ax0.set_ylabel(ylabel)
         
 
-    xposition = 0.98
-    yposition=1.03
+    xposition = 0.8
+    yposition=0.9
+    # xposition = 0.83
+    # yposition=1.03
     text = 'H1 Preliminary'
     WriteText(xposition,yposition,text,ax0)
 
