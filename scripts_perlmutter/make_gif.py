@@ -18,6 +18,7 @@ flags = parser.parse_args()
 
 base_folder = flags.folder
 #to_gif = flags.plot
+font = ImageFont.truetype("Helvetica-Bold.ttf", size=35)
 
 plot_list = {
     'gen_jet_ncharged_6':r'$\mathrm{N_{c}}$', 
@@ -35,8 +36,6 @@ plot_list = {
     # 'gen_jet_tau20':r'$\mathrm{log}(\lambda_2^1)$',
 }
 
-#font = ImageFont.load_default(size=25)
-font = ImageFont.truetype("Helvetica-Bold.ttf", size=35)
 for to_gif in plot_list:
     frames = []
     for i in range(1,flags.niter+1):

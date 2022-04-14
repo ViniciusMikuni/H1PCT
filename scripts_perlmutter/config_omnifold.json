@@ -4,7 +4,7 @@
     'BATCH_SIZE': 2048,
     'EPOCHS': 100,
     'NWARMUP': 3,
-    'NPATIENCE': 5,
+    'NPATIENCE': 10,
 },
 'PCT': {
     'NHEAD': 5,
