@@ -200,7 +200,7 @@ for var in gen_var_names:
         ax0.set_ylim(top=opt.fixed_yaxis[var])
     else:
         max_y = max(data_pred)
-        ax0.set_ylim(top=2.2*max_y)
+        ax0.set_ylim(top=2.4*max_y)
     #######################################
     # Processing systematic uncertainties #
     #######################################
@@ -297,9 +297,11 @@ for var in gen_var_names:
             data_pred,_,_=ax0.hist(data_var,weights=weight_data*mc_info[data_name].nominal_wgts,bins=binning,label=label_data,density=True,color="black",histtype="step")
     var_name = gen_var_names[var]
     if 'ncharge' in var:
-        var_name = r'$N_c$'
+        var_name = r'$\tilde{\lambda}_0^0$'
     elif 'charge' in var:
-        var_name = r'$Q_1$'
+        var_name = r'$\tilde{\lambda}_0^1$'
+    elif 'ptD' in var:
+        var_name = r'$\sqrt{\lambda_0^2}$'
         
     if flags.plot_reco:
         opt.FormatFig(xlabel = "", ylabel = r'1/N $\mathrm{dN}/\mathrm{d}$%s'%var_name,ax0=ax0)
@@ -347,8 +349,10 @@ for var in gen_var_names:
         pred,_=np.histogram(mc_var,weights=mc_info[mc_name].nominal_wgts,bins=binning,density=True)
         ax0.plot(xaxis,pred,color=opt.colors[mc],marker=opt.markers[mc],ms=12,lw=0,markerfacecolor='none',markeredgewidth=3,label=mc)
         ratios[mc] = 100*np.divide(pred-data_pred,data_pred)        
-        #Ratio plot    
-        ax1.plot(xaxis,ratios[mc],color=opt.colors[mc],marker=opt.markers[mc],ms=12,lw=0,markerfacecolor='none',markeredgewidth=3)
+        #Ratio plot
+        displacement = opt.xaxis_disp[mc]
+        xpos = xaxis+np.abs(np.diff(binning)/2.)*displacement
+        ax1.plot(xpos,ratios[mc],color=opt.colors[mc],marker=opt.markers[mc],ms=12,lw=0,markerfacecolor='none',markeredgewidth=3)
 
     if flags.closure ==False and flags.plot_reco==False:
         for mc_name in standalone_predictions:

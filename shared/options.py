@@ -38,12 +38,15 @@ markers = {
     'hybrid':'x',
 }
 
+#Shift in x-axis for visualization
 xaxis_disp = {
     'Pythia': 0.0,
     'Pythia_Vincia': 0.3,
     'Pythia_Dire': 0.6,
     'Herwig':-0.3,
     'Herwig_Matchbox':-0.6,
+    'Djangoh':-0.3,
+    'Rapgap':0.3
 }
     
 
@@ -75,7 +78,7 @@ fixed_yaxis = {
     'gen_jet_tau10':3,
     'gen_jet_tau15':2,
     'gen_jet_tau20':2,
-    'gen_jet_ptD':12.5,
+    'gen_jet_ptD':12,
 
     }
 
@@ -114,18 +117,18 @@ name_translate = {
 }
 
 reco_vars = {
-    'jet_ncharged':r'Charged hadron multiplicity', 
-    'jet_charge':r'Jet Charge', 
-    'jet_ptD':r'$p_\mathrm{T}\mathrm{D}$',
+    'jet_ncharged':r'Charged hadron multiplicity $(\tilde{\lambda}_0^0)$', 
+    'jet_charge':r'Jet Charge $(\tilde{\lambda}_0^1)$', 
+    'jet_ptD':r'$p_\mathrm{T}\mathrm{D}$ $(\sqrt{\lambda_0^2})$',
     'jet_tau10':r'$\mathrm{log}(\lambda_1^1)$', 
     'jet_tau15':r'$\mathrm{log}(\lambda_{1.5}^1)$',
     'jet_tau20':r'$\mathrm{log}(\lambda_2^1)$',
 }
 
 gen_vars = {
-    'gen_jet_ncharged':r'Charged hadron multiplicity', 
-    'gen_jet_charge':r'Jet Charge', 
-    'gen_jet_ptD':r'$p_\mathrm{T}\mathrm{D}$',
+    'gen_jet_ncharged':r'Charged hadron multiplicity $(\tilde{\lambda}_0^0)$', 
+    'gen_jet_charge':r'Jet Charge $(\tilde{\lambda}_0^1)$', 
+    'gen_jet_ptD':r'$p_\mathrm{T}\mathrm{D}$ $(\sqrt{\lambda_0^2})$',
     'gen_jet_tau10':r'$\mathrm{log}(\lambda_1^1)$', 
     'gen_jet_tau15':r'$\mathrm{log}(\lambda_{1.5}^1)$',
     'gen_jet_tau20':r'$\mathrm{log}(\lambda_2^1)$',
@@ -222,7 +225,7 @@ def FormatFig(xlabel,ylabel,ax0):
     yposition=0.9
     # xposition = 0.83
     # yposition=1.03
-    text = 'H1 Preliminary'
+    text = r'$\bf{H1}$ Preliminary'
     WriteText(xposition,yposition,text,ax0)
 
 
@@ -231,7 +234,8 @@ def WriteText(xpos,ypos,text,ax0):
     plt.text(xpos, ypos,text,
              horizontalalignment='center',
              verticalalignment='center',
-             transform = ax0.transAxes, fontsize=25, fontweight='bold')
+             #fontweight='bold',
+             transform = ax0.transAxes, fontsize=25)
 
 
     
