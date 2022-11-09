@@ -34,8 +34,6 @@ namespace Rivet {
       book(_hist_tau10, "gen_jet_tau10",7,-2.2,-1);
       book(_hist_tau15, "gen_jet_tau15",7,-3.0,-1.2);
       book(_hist_tau20, "gen_jet_tau20",7,-3.5,-1.5);
-      book(_hist_z, "gen_jet_z",7,0.1,1.0);
-      book(_hist_z1, "gen_jet_z1",7,0.1,1.0);
       
       book(_hist_ncharge2D, "gen_jet_ncharged2D",linspace(19,1,20,5),logspace(4,150, 5000.0));
       book(_hist_charge2D, "gen_jet_charge2D",linspace(9,-0.8,0.8),logspace(4,150, 5000.0));
@@ -43,8 +41,29 @@ namespace Rivet {
       book(_hist_tau102D, "gen_jet_tau102D",linspace(7,-2.2,-1),logspace(4,150, 5000.0));
       book(_hist_tau152D, "gen_jet_tau152D",linspace(7,-3.0,-1.2),logspace(4,150, 5000.0));
       book(_hist_tau202D, "gen_jet_tau202D",linspace(7,-3.5,-1.5),logspace(4,150, 5000.0));
-      book(_hist_z2D, "gen_jet_z2D",linspace(7,0.1,1.0),logspace(4,150, 5000.0));
-      book(_hist_z12D, "gen_jet_z12D",linspace(7,0.1,1.0),logspace(4,150, 5000.0));
+
+      book(_hist_ncharge_mom1, "gen_jet_ncharged_mom1",logspace(4,150, 5000.0));
+      book(_hist_charge_mom1, "gen_jet_charge_mom1",logspace(4,150, 5000.0));
+      book(_hist_ptD_mom1, "gen_jet_ptD_mom1",logspace(4,150, 5000.0));
+      book(_hist_tau10_mom1, "gen_jet_tau10_mom1",logspace(4,150, 5000.0));
+      book(_hist_tau15_mom1, "gen_jet_tau15_mom1",logspace(4,150, 5000.0));
+      book(_hist_tau20_mom1, "gen_jet_tau20_mom1",logspace(4,150, 5000.0));
+      book(_hist_logtau10_mom1, "gen_jet_logtau10_mom1",logspace(4,150, 5000.0));
+      book(_hist_logtau15_mom1, "gen_jet_logtau15_mom1",logspace(4,150, 5000.0));
+      book(_hist_logtau20_mom1, "gen_jet_logtau20_mom1",logspace(4,150, 5000.0));
+
+
+      book(_hist_ncharge_mom2, "gen_jet_ncharged_mom2",logspace(4,150, 5000.0));
+      book(_hist_charge_mom2, "gen_jet_charge_mom2",logspace(4,150, 5000.0));
+      book(_hist_ptD_mom2, "gen_jet_ptD_mom2",logspace(4,150, 5000.0));     
+      book(_hist_tau10_mom2, "gen_jet_tau10_mom2",logspace(4,150, 5000.0));
+      book(_hist_tau15_mom2, "gen_jet_tau15_mom2",logspace(4,150, 5000.0));
+      book(_hist_tau20_mom2, "gen_jet_tau20_mom2",logspace(4,150, 5000.0));
+      book(_hist_logtau10_mom2, "gen_jet_logtau10_mom2",logspace(4,150, 5000.0));
+      book(_hist_logtau15_mom2, "gen_jet_logtau15_mom2",logspace(4,150, 5000.0));
+      book(_hist_logtau20_mom2, "gen_jet_logtau20_mom2",logspace(4,150, 5000.0));
+
+
       
     }
 
@@ -69,8 +88,6 @@ namespace Rivet {
       if (Q2 < 150.0*GeV2) vetoEvent;
       if (y>0.7) vetoEvent;
       if(y<0.2) vetoEvent;
-            // Weight of the event
-      _hist_Q2->fill(Q2);
 
       // Momentum of the scattered lepton
       const double enel = eout.E();
@@ -91,6 +108,7 @@ namespace Rivet {
       //float qt = 0;
       Jets jets = apply<FastJets>(event, "jets").jetsByPt(Cuts::pT > 10*GeV && Cuts::eta < 2.5 && Cuts::eta>-1.0);  
       for (int i = 0; i < jets.size(); ++i){
+	if (jets[i].size()==1) continue;
 	int gen_ncharged = 0;
 	float gen_jet_charge = 0;
 	float gen_jet_ptD = 0;
@@ -99,8 +117,7 @@ namespace Rivet {
 	float gen_tau20 = 0;
 	float sumpt=0;
 	float maxpt=0;
-	float z=0;
-	float z1=0;
+	
 	FourMomentum jetmom = jets[i].momentum();
 	for (const Particle& p : jets[i].particles()) {
 	  //PseudoJet hfs_candidate = PseudoJet(p.px(), p.py(), p.pz(), p.energy());
@@ -110,13 +127,9 @@ namespace Rivet {
 	  gen_tau15+=p.pt()*pow(deltaR(p,jets[i]),1.5);
 	  gen_tau20+=p.pt()*pow(deltaR(p,jets[i]),2);
 	  
-	  float jet_abs = pow(jetmom.px(), 2) + pow(jetmom.py(), 2)+pow(jetmom.pz(), 2);
-	  z = (p.px()*jetmom.px() + p.py()*jetmom.py() + p.pz()*jetmom.pz())/jet_abs;
-	  _hist_z->fill(z);
-	  _hist_z2D->fill(z,Q2);
+
 	  if (p.pt()>maxpt){
 	    maxpt = p.pt();
-	    z1=z;
 	  }
 	    
 	  if (p.charge() != 0){
@@ -132,7 +145,7 @@ namespace Rivet {
 	_hist_tau10->fill(log(gen_tau10/jetmom.pt()));
 	_hist_tau15->fill(log(gen_tau15/jetmom.pt()));
 	_hist_tau20->fill(log(gen_tau20/jetmom.pt()));
-	_hist_z->fill(z1);
+
 
 	_hist_charge2D->fill(gen_jet_charge/jetmom.pt(),Q2);
 	_hist_ptD2D->fill(pow(gen_jet_ptD,0.5)/sumpt,Q2);
@@ -140,7 +153,30 @@ namespace Rivet {
 	_hist_tau102D->fill(log(gen_tau10/jetmom.pt()),Q2);
 	_hist_tau152D->fill(log(gen_tau15/jetmom.pt()),Q2);
 	_hist_tau202D->fill(log(gen_tau20/jetmom.pt()),Q2);
-	_hist_z2D->fill(z1,Q2);
+
+	_hist_charge_mom1->fill(Q2,gen_jet_charge/jetmom.pt());
+	_hist_ptD_mom1->fill(Q2,pow(gen_jet_ptD,0.5)/sumpt);
+	_hist_ncharge_mom1->fill(Q2,gen_ncharged);
+	_hist_logtau10_mom1->fill(Q2,log(gen_tau10/jetmom.pt()));
+	_hist_logtau15_mom1->fill(Q2,log(gen_tau15/jetmom.pt()));
+	_hist_logtau20_mom1->fill(Q2,log(gen_tau20/jetmom.pt()));
+	_hist_tau10_mom1->fill(Q2,gen_tau10/jetmom.pt());
+	_hist_tau15_mom1->fill(Q2,gen_tau15/jetmom.pt());
+	_hist_tau20_mom1->fill(Q2,gen_tau20/jetmom.pt());
+
+
+	_hist_charge_mom2->fill(Q2,pow(gen_jet_charge/jetmom.pt(),2));
+	_hist_ptD_mom2->fill(Q2,pow(pow(gen_jet_ptD,0.5)/sumpt,2));
+	_hist_ncharge_mom2->fill(Q2,pow(gen_ncharged,2));
+	_hist_logtau10_mom2->fill(Q2,pow(log(gen_tau10/jetmom.pt()),2));
+	_hist_logtau15_mom2->fill(Q2,pow(log(gen_tau15/jetmom.pt()),2));
+	_hist_logtau20_mom2->fill(Q2,pow(log(gen_tau20/jetmom.pt()),2));
+	_hist_tau10_mom2->fill(Q2,pow(gen_tau10/jetmom.pt(),2));
+	_hist_tau15_mom2->fill(Q2,pow(gen_tau15/jetmom.pt(),2));
+	_hist_tau20_mom2->fill(Q2,pow(gen_tau20/jetmom.pt(),2));
+
+	// Weight of the event
+	_hist_Q2->fill(Q2);
 
 	
       }
@@ -157,6 +193,9 @@ namespace Rivet {
 
     /// The histograms.
     Histo1DPtr _hist_Q2, _hist_ncharge, _hist_charge, _hist_ptD, _hist_tau10,  _hist_tau15,  _hist_tau20,_hist_z,_hist_z1 ;
+    Histo1DPtr _hist_ncharge_mom1, _hist_charge_mom1, _hist_ptD_mom1, _hist_tau10_mom1,  _hist_tau15_mom1,  _hist_tau20_mom1, _hist_logtau10_mom1,  _hist_logtau15_mom1,  _hist_logtau20_mom1;
+    Histo1DPtr _hist_ncharge_mom2, _hist_charge_mom2, _hist_ptD_mom2, _hist_tau10_mom2,  _hist_tau15_mom2,  _hist_tau20_mom2, _hist_logtau10_mom2,  _hist_logtau15_mom2,  _hist_logtau20_mom2;
+
     Histo2DPtr  _hist_ncharge2D, _hist_charge2D, _hist_ptD2D, _hist_tau102D,  _hist_tau152D,  _hist_tau202D,_hist_z2D,_hist_z12D;
     
 

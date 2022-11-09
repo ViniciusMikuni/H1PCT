@@ -165,8 +165,8 @@ for mc_name in mc_names:
     del mc
     del data
 
-    weights_MC_sim = weights_MC_sim/np.average(weights_MC_sim[pass_reco==1])
-    weights_MC_sim *= 1.0*data_vars.shape[0]/weights_MC_sim[pass_reco==1].shape[0]
+    weights_MC_sim = weights_MC_sim/np.sum(weights_MC_sim[pass_reco==1])
+    weights_MC_sim *= 1.0*data_vars.shape[0]
     
     if flags.verbose:
         print(80*'#')

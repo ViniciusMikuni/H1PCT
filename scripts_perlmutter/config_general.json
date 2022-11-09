@@ -1,5 +1,5 @@
 {
-    'MC_NAMES':['Djangoh_nominal'],
+    'MC_NAMES':['Rapgap_nominal','Djangoh_nominal'],
     'MC_NAMES_FULL':['Rapgap_nominal','Djangoh_nominal','Rapgap_sys_0','Rapgap_sys_1','Rapgap_sys_5','Rapgap_sys_7','Rapgap_sys_11','Djangoh_sys_0','Djangoh_sys_1','Djangoh_sys_5','Djangoh_sys_7','Djangoh_sys_11'],
     'VAR_MLP': ['jet_pt','jet_eta','jet_phi','Q2','jet_ncharged',  'jet_charge', 'jet_ptD','jet_tau10', 'jet_tau15', 'jet_tau20'],
     'VAR_MLP_GEN': ['genjet_pt','genjet_eta','genjet_phi','gen_Q2','gen_jet_ncharged','gen_jet_charge', 'gen_jet_ptD','gen_jet_tau10', 'gen_jet_tau15', 'gen_jet_tau20'],

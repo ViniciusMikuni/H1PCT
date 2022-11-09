@@ -39,10 +39,10 @@ def MLP(nvars,NTRIALS=10):
         layer = Dense(128, activation='relu')(layer)
         layer = Dense(64,activation='relu')(layer)
         #layer = Dropout(0.05)(layer) 
-        layer = Dense(1,activation='sigmoid')(layer)
+        layer = Dense(1,activation="sigmoid")(layer)
         net_trials.append(layer)
 
     #outputs = tfp.stats.percentile(net_trials, 50.0, interpolation='midpoint',axis=0)
     outputs = tf.reduce_mean(net_trials,0) #Average over trials
-    #outputs = tf.keras.activations.sigmoid(outputs)
+    # outputs = tf.keras.activations.sigmoid(outputs)
     return inputs,outputs

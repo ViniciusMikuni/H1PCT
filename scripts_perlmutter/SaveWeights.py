@@ -19,7 +19,7 @@ if gpus:
 
 
 class MCInfo():
-    def __init__(self,mc_name,N,data_folder,config,q2_int=0,is_reco=False):
+    def __init__(self,mc_name,N,data_folder,config,q2_int=0,is_reco=False,use_fiducial_mask=True):
         self.N = int(N)
         self.file = h5.File(os.path.join(data_folder,"{}.h5".format(mc_name)),'r')
         self.is_reco = is_reco
@@ -27,9 +27,12 @@ class MCInfo():
 
         if not self.is_reco:
             self.truth_mask = self.file['pass_truth'][:self.N] #pass truth region definition
-            particle_mask = np.sum(self.file['gen_jet_part_pt'][:self.N] > 0,-1) > 1
-            self.mask = (self.truth_mask==1)&(self.file['pass_fiducial'][:self.N] == 1) #pass fiducial region definition
-            #self.mask = (self.mask) * (particle_mask)
+            if use_fiducial_mask:
+                particle_mask = np.sum(self.file['gen_jet_part_pt'][:self.N] > 0,-1) > 1
+                self.mask = (self.truth_mask==1)&(self.file['pass_fiducial'][:self.N] == 1) #pass fiducial region definition
+                self.mask = (self.mask) * (particle_mask)            
+            else:
+                self.mask = (self.truth_mask==1)
             q2_name = 'gen_Q2'
         else:
             self.mask = self.file['pass_reco'][:self.N] == 1 #pass fiducial region definition
@@ -110,7 +113,7 @@ if __name__=='__main__':
     parser.add_argument('--mode', default='hybrid', help='Which train type to load [hybrid/standard/PCT]')
     parser.add_argument('--config', default='config_general.json', help='Basic config file containing general options')
     parser.add_argument('--out', default='/pscratch/sd/v/vmikuni/H1/weights', help='Folder to save the weights')
-    parser.add_argument('--niter', type=int, default=5, help='Omnifold iteration to load')
+    parser.add_argument('--niter', type=int, default=6, help='Omnifold iteration to load')
    
     flags = parser.parse_args()
     config=LoadJson(flags.config)
@@ -122,11 +125,11 @@ if __name__=='__main__':
     mc_names = ['Rapgap_nominal']   
     for mc_name in mc_names:
         print("{}.h5".format(mc_name))    
-        mc_info = MCInfo(mc_name,int(100e6),flags.data_folder,config,use_mask=False)
+        mc_info = MCInfo(mc_name,int(100e6),flags.data_folder,config,use_fiducial_mask=False)
         model_strap = '../weights_strap/{}_{}_iter{}_step2_strapX.h5'.format(
             base_name,mc_name,flags.niter)
         mfold = mc_info.LoadDataWeights(flags.niter,mode=flags.mode)
-        for nstrap in range(69,config['NBOOTSTRAP']+1):
+        for nstrap in range(1,config['NBOOTSTRAP']+1):
             print(nstrap)
             weights =  mc_info.Reweight(mfold,model_name=model_strap.replace('X',str(nstrap)))            
             with h5.File(os.path.join(flags.out,'{}_{}.h5'.format(mc_name,nstrap)),'w') as fout:

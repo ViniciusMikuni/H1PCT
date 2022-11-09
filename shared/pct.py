@@ -16,10 +16,10 @@ def GetLocalFeat(pc,outsize):
 
     features = Conv2D(outsize, kernel_size=[1,1], data_format='channels_last',
                       strides=[1,1],activation='relu')(pc)
-    #features = BatchNormalization()(features) 
+    # features = BatchNormalization()(features) 
     features = Conv2D(outsize, kernel_size=[1,1], data_format='channels_last',
                       strides=[1,1],activation='relu')(features)
-    #features = BatchNormalization()(features) 
+    # features = BatchNormalization()(features) 
     features = tf.reduce_max(features, axis=-2)    
     return features
 
@@ -144,19 +144,33 @@ def pairwise_distanceR(point_cloud, mask=None):
       pairwise distance: (batch_size, num_points, num_points)
     """
 
-    point_cloud = point_cloud[:,:,:2] #eta-phi
-  
+    point_cloud = point_cloud[:,:,:2] #eta-phi  
     point_cloud_transpose = tf.transpose(point_cloud, perm=[0, 2, 1])
+
+    point_cloud_phi = point_cloud_transpose[:, 1:, :] #Bx1xN
+    point_cloud_phi = tf.tile(point_cloud_phi, [1, point_cloud_phi.get_shape()[2], 1]) #BxNxN
+    point_cloud_phi_transpose = tf.transpose(point_cloud_phi, perm=[0, 2, 1]) #BxNxN
+    point_cloud_phi = tf.math.abs(point_cloud_phi - point_cloud_phi_transpose)
+    is_biggerpi = tf.greater_equal(tf.abs(point_cloud_phi), np.pi) #is the abs greater than pi?
+    point_cloud_phi_corr = tf.where(is_biggerpi, 2 * np.pi - point_cloud_phi, point_cloud_phi)
+
+    
     point_cloud_inner = tf.matmul(point_cloud, point_cloud_transpose) # x.x + y.y + z.z shape: NxN
     point_cloud_inner = -2*point_cloud_inner
-    point_cloud_square = tf.reduce_sum(tf.square(point_cloud), axis=-1, keepdims=True) # from x.x, y.y, z.z to x.x + y.y + z.z
-    point_cloud_square_tranpose = tf.transpose(point_cloud_square, perm=[0, 2, 1])
+    point_cloud_square = tf.reduce_sum(tf.square(point_cloud), axis=-1, keepdims=True) # from x.x, y.y, z.z to x.x + y.y + z.z    
+    point_cloud_square_transpose = tf.transpose(point_cloud_square, perm=[0, 2, 1])
+
+    deltaR_matrix = point_cloud_square + point_cloud_square_transpose + point_cloud_inner #this matrix contains the squared, pairwise DRs between particles in the cloud
+    deltaR_matrix = deltaR_matrix - tf.square(point_cloud_phi) #subtract non-corrected delta_phi squared part
+    deltaR_matrix = deltaR_matrix + tf.square(point_cloud_phi_corr) #add corrected delta_phi squared part
+
     if mask != None:
-        zero_mask = 10000*tf.expand_dims(mask,-1)
-        zero_mask_transpose = tf.transpose(zero_mask, perm=[0, 2, 1])
-        zero_mask = zero_mask + zero_mask_transpose
-        zero_mask = tf.where(tf.equal(zero_mask,20000),tf.zeros_like(zero_mask),zero_mask)
-    return point_cloud_square + point_cloud_inner + point_cloud_square_tranpose + zero_mask,zero_mask 
+        point_shift = 1000*tf.expand_dims(mask,-1) #BxNx1
+        point_shift_transpose = tf.transpose(point_shift,perm=[0, 2, 1]) #Bx1xN
+        zero_mask = point_shift_transpose + point_shift #when adding tensors having a dimension equal to 1, tf tiles them to make them compatible for the sum
+        zero_mask = tf.where(tf.equal(zero_mask, 2000), tf.zeros_like(zero_mask), zero_mask)
+        
+    return deltaR_matrix + zero_mask, zero_mask
 
 
 def pairwise_distance(point_cloud, mask=None): 
@@ -209,20 +223,21 @@ def PCT(npoints,nvars=1,nheads=1,nglobal=1):
     
     for _ in range(nheads):
         edge_feature_0 = GetEdgeFeat(inputs, nn_idx=nn_idx, k=k)    
-        features_0 = GetLocalFeat(edge_feature_0,128)
+        features_0 = GetLocalFeat(edge_feature_0,64)
         # inputs_0 = Conv1D(128, kernel_size = 1,use_bias=True,
         #                   strides=1,activation='relu')(inputs) #B,N,C
         #net_glob = Dense(npoints*128 ,activation='relu')(input_global)
-        net_glob = Dense(128 ,activation='relu')(input_global)
-        net_glob = tf.reshape(net_glob,[-1,1,128])
-        features_0 = features_0 + net_glob
+        net_glob = Dense(64 ,activation='relu')(input_global)
+        net_glob = tf.reshape(net_glob,[-1,1,64])
+        net_glob = tf.tile(net_glob,[1,npoints,1])
+        features_0 = tf.concat([features_0,net_glob],-1)
         
         # adj = pairwise_distance(features_0,mask_matrix)
         # nn_idx = knn(adj, k=k)
 
         # edge_feature_1 = GetEdgeFeat(features_0, nn_idx=nn_idx, k=k)    
-        # features_1 = GetLocalFeat(edge_feature_1,128)
-        #features_1 = features_1 + inputs_0
+        # features_1 = GetLocalFeat(edge_feature_1,64)
+        # features_1 = features_1 + inputs_0
         
         self_att_1,attention1 = GetSelfAtt(features_0,mask,128)
         self_att_2,attention2 = GetSelfAtt(self_att_1,mask,128)
@@ -239,25 +254,25 @@ def PCT(npoints,nvars=1,nheads=1,nglobal=1):
         #128
         net = Conv1D(512, kernel_size = 1,
                      strides=1,activation='relu')(concat)
-        #net = BatchNormalization()(net) 
-        #net = tf.reduce_mean(net, axis=1)
+        # net = BatchNormalization()(net) 
         net = tf.reduce_max(net, axis=1)
+        # net = tf.reduce_max(net, axis=1)
 
         #Process global inputs
-        # net_glob = Dense(128 ,activation='relu')(input_global)
+        # net_glob = Dense(512 ,activation='relu')(input_global)
         # net = net+net_glob
 
         net = Dense(256,activation='relu')(net)
         #net = Dense(128,activation='relu')(net)
-        #net = Dropout(0.05)(net)
-        #net = BatchNormalization()(net)
+        # net = Dropout(0.2)(net)
+        # net = BatchNormalization()(net)
         #,activation='sigmoid'
-        net = Dense(1,activation='sigmoid')(net)
+        net = Dense(1,activation="sigmoid")(net)
         net_trials.append(net)
 
     #outputs = tfp.stats.percentile(net_trials, 50.0, interpolation='midpoint')
-    outputs = tf.reduce_mean(net_trials,0) #Average over trials    
-    #outputs = tf.keras.activations.sigmoid(outputs)
+    outputs = tf.reduce_mean(net_trials,0) #Average over trials
+    # outputs = tf.keras.activations.sigmoid(outputs)
     #return inputs,outputs
     return inputs,input_global,outputs
 
@@ -295,8 +310,6 @@ if __name__ == '__main__':
         'tf.math.top_k':'knn idx'
     }
     
-
-
         
     for layer in model.layers:
         if layer.name in name_translation.keys():

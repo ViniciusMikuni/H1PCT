@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib import gridspec
 from matplotlib.collections import PatchCollection
 from matplotlib.patches import Rectangle
+import matplotlib.ticker as mtick
 import uproot3 as uproot
     
 colors = {
@@ -15,8 +16,12 @@ colors = {
     'Djangoh':'#8c564b',
     'Rapgap':'darkorange',
     'Herwig':'crimson',
-    'Herwig_Matchbox':'crimson',
+    'Herwig_Matchbox':'#a50f15',
+    'Herwig_Merging':'#fc9272',
     'Cascade':'b',
+    'Sherpa2LOLund':'#006837',
+    'Sherpa2LOCluster':'#addd8e',
+    'Sherpa3NLO':'#31a354',
     
     'PCT': 'g',    
     'standard':'blueviolet',
@@ -29,24 +34,32 @@ markers = {
     'Rapgap':'X',
 
     'Pythia': '^',
-    'Pythia_Vincia': '<',
-    'Pythia_Dire': '>',
+    'Pythia_Vincia': '^',
+    'Pythia_Dire': '^',
     'Herwig':'D',
-    'Herwig_Matchbox':'d',
+    'Herwig_Matchbox':'D',
+    'Herwig_Merging':'D',
     'PCT':'P',
     'standard':'o',
     'hybrid':'x',
+    'Sherpa2LOCluster':'o',
+    'Sherpa2LOLund':'o',
+    'Sherpa3NLO':'o',
 }
 
 #Shift in x-axis for visualization
 xaxis_disp = {
-    'Pythia': 0.0,
-    'Pythia_Vincia': 0.3,
-    'Pythia_Dire': 0.6,
+    'Pythia_Vincia': -0.7,
+    'Pythia_Dire': -0.6,
+    'Pythia': -0.5,
     'Herwig':-0.3,
-    'Herwig_Matchbox':-0.6,
-    'Djangoh':-0.3,
-    'Rapgap':0.3
+    'Herwig_Matchbox':-0.2,
+    'Herwig_Merging':-0.1,
+    'Djangoh':0.1,
+    'Rapgap':0.2,
+    'Sherpa2LOLund':0.5,
+    'Sherpa2LOCluster':0.6,
+    'Sherpa3NLO':0.7,
 }
     
 
@@ -79,7 +92,8 @@ fixed_yaxis = {
     'gen_jet_tau15':2,
     'gen_jet_tau20':2,
     'gen_jet_ptD':12,
-
+    'genjet_pt':12,
+    'gen_Q2':12,
     }
 
 sys_sources = {
@@ -88,7 +102,7 @@ sys_sources = {
     'sys_5':'#a6d854',
     'sys_7':'#ffd92f',
     'sys_11':'#8da0cb',
-    'QED': '#8c564b',
+    # 'QED': '#8c564b',
     'model':'#e78ac3',
     'closure': '#e5c494',
     'stat':'#808000'
@@ -108,11 +122,17 @@ sys_translate = {
 }
 
 name_translate = {
-    'Herwig': "Herwig",
-    'Herwig_Matchbox': "Herwig + Matchbox",
-    'Pythia': 'Pythia',
-    'Pythia_Vincia':'Pythia + Vincia',
-    'Pythia_Dire':'Pythia + Dire',
+    'Herwig': "Herwig 7.2",
+    'Herwig_Matchbox': "Herwig 7.2 + Matchbox",
+    'Herwig_Merging': "Herwig 7.2 + Merging",
+    'Pythia': 'Pythia 8.3',
+    'Pythia_Vincia':'Pythia 8.3 + Vincia',
+    'Pythia_Dire':'Pythia 8.3 + Dire',
+    'Sherpa2LOCluster':'Sherpa 2.2.12 LO Cluster',
+    'Sherpa2LOLund':'Sherpa 2.2.12 LO Lund',
+    'Sherpa3NLO': 'Sherpa 3 NLO Cluster',
+    'Rapgap': 'RAPGAP',
+    'Djangoh': 'DJANGOH',
 
 }
 
@@ -132,30 +152,14 @@ gen_vars = {
     'gen_jet_tau10':r'$\mathrm{log}(\lambda_1^1)$', 
     'gen_jet_tau15':r'$\mathrm{log}(\lambda_{1.5}^1)$',
     'gen_jet_tau20':r'$\mathrm{log}(\lambda_2^1)$',
+    # 'genjet_pt':r'Jet $p_\mathrm{T}$',
+    # 'gen_Q2':r'$Q^2$', 
 }
 
-# dedicated_binning = {
-#     'gen_jet_ncharged':np.linspace(1,15,14),
-#     'gen_jet_charge':np.linspace(-1,1,30),
-#     'genjet_pt': np.logspace(np.log10(10),np.log10(100),30),
-#     'jet_pt': np.logspace(np.log10(10),np.log10(100),30),
-#     'genjet_eta':np.linspace(-1,2.5,6),
-#     'genjet_phi':np.linspace(-3.14,3.14,8),
-
-#     'gen_jet_tau10':np.linspace(-3,-0.3,30),
-#     'gen_jet_tau15':np.linspace(-4,-0.5,30),
-#     'gen_jet_tau20':np.linspace(-5,-0.5,30),
-    
-    
-#     'gen_jet_ptD':np.linspace(0.2,0.9,30),
-#     'gen_Q2':np.logspace(np.log10(200),np.log10(1000),5),
-    
-    
-#     'gene_px':np.logspace(np.log10(1),np.log10(100),7),
-#     'gene_py':np.logspace(np.log10(1),np.log10(100),7),
-#     'gene_pz':np.logspace(np.log10(1),np.log10(100),7),
-# }
-
+class ScalarFormatterClass(mtick.ScalarFormatter):
+    #https://www.tutorialspoint.com/show-decimal-places-and-scientific-notation-on-the-axis-of-a-matplotlib-plot
+    def _set_format(self):
+        self.format = "%1.2f"
 
 def LoadFromROOT(file_name,var_name,q2_bin=0):
     with uproot.open(file_name) as f:
@@ -169,7 +173,6 @@ def LoadFromROOT(file_name,var_name,q2_bin=0):
         else: #2D slice of histogram
             var =  hist[var_name+"2D"].numpy()[0][:,q2_bin-1]
             bins = hist[var_name+"2D"].numpy()[1][0][0]
-            
         norm = 0
         for iv, val in enumerate(var):
             norm += val*abs(bins[iv+1]-bins[iv])
@@ -201,7 +204,7 @@ def SetStyle():
     hep.style.use("CMS") 
 
 def SetGrid(npanels=2):
-    fig = plt.figure(figsize=(9, 9))
+    fig = plt.figure(figsize=(10, 9))
     if npanels ==2:
         gs = gridspec.GridSpec(2, 1, height_ratios=[3,1]) 
         gs.update(wspace=0.025, hspace=0.1)
@@ -212,7 +215,7 @@ def SetGrid(npanels=2):
         gs = gridspec.GridSpec(1, 1)
     return fig,gs
 
-def FormatFig(xlabel,ylabel,ax0):
+def FormatFig(xlabel,ylabel,ax0,xpos=0.8,ypos=0.9):
     #Limit number of digits in ticks
     # y_loc, _ = plt.yticks()
     # y_update = ['%.1f' % y for y in y_loc]
@@ -221,8 +224,8 @@ def FormatFig(xlabel,ylabel,ax0):
     ax0.set_ylabel(ylabel)
         
 
-    xposition = 0.8
-    yposition=0.9
+    xposition = xpos
+    yposition=ypos
     # xposition = 0.83
     # yposition=1.03
     text = r'$\bf{H1}$ Preliminary'

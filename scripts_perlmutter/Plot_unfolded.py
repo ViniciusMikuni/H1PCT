@@ -27,7 +27,7 @@ parser.add_argument('--sys', action='store_true', default=False,help='Evaluate r
 parser.add_argument('--comp', action='store_true', default=False,help='Compare closure unc. from different methods')
 parser.add_argument('--plot_reco', action='store_true', default=False,help='Plot reco level comparison between data and MC predictions')
 parser.add_argument('-N',type=float,default=20e6, help='Number of events to evaluate')
-parser.add_argument('--niter', type=int, default=5, help='Omnifold iteration to load')
+parser.add_argument('--niter', type=int, default=6, help='Omnifold iteration to load')
 parser.add_argument('--q2_int', type=int, default=0, help='Q2 interval to consider')
 parser.add_argument('--img_fmt', default='pdf', help='Format of the output figures')
 
@@ -38,7 +38,8 @@ config=LoadJson(flags.config)
 
 
 mc_names = ['Rapgap_nominal','Djangoh_nominal']
-standalone_predictions = ['Herwig','Pythia','Pythia_Vincia','Pythia_Dire']
+standalone_predictions = ['Herwig','Pythia','Sherpa2LOCluster']
+#standalone_predictions = ['Herwig','Pythia','Sherpa3NLO','Pythia_Vincia','Pythia_Dire','Sherpa2LOLund','Sherpa2LOCluster']
 #'Herwig_Matchbox'
 #standalone_predictions = []    
 data_idx = 0 #Sample that after weights represent data
@@ -50,6 +51,11 @@ folder = 'results'
 text_ypos = 0.67 #text position height
 text_xpos = 0.82
 version = data_name
+ms=10 #marker size
+apply_qed_corr = False #Apply QED correction to unfolded data
+
+    
+
 if flags.closure:
     version  +='_closure'
 
@@ -65,9 +71,9 @@ def RatioLabel(ax1,var):
     ax1.axhline(y=0.0, color='r', linestyle='-')
     # ax1.axhline(y=10, color='r', linestyle='--')
     # ax1.axhline(y=-10, color='r', linestyle='--')
-    ylim = [-70,70]
+    ylim = [-80,80]
     if 'ncharged' in var:
-        ylim = [-100,150]
+        ylim = [-110,150]
 
     if flags.plot_reco or flags.closure:
         ylim = [-50,50]
@@ -101,7 +107,7 @@ def PlotUnc(xaxis,values,xlabel='',add_text=''):
                  verticalalignment='center',
                  transform = ax.transAxes, fontsize=18)
         
-    plt.legend(loc='best',fontsize=12,ncol=2)
+    plt.legend(loc='upper left',fontsize=12,ncol=2)
     plt.ylim([0,2*max_y])
     return fig
 
@@ -194,6 +200,9 @@ for var in gen_var_names:
         data_pred,_=np.histogram(data_var,bins=binning,density=True)
     else:
         data_pred,_=np.histogram(data_var,weights=weight_data*mc_info[data_name].nominal_wgts,bins=binning,density=True)
+        if apply_qed_corr:
+            qed_corr=LoadJson('QED_Rapgap.json')
+            data_pred = data_pred*(np.array(qed_corr[var][str(flags.q2_int)]))
         
     ratios = {}
     if flags.q2_int==0 and flags.plot_reco==False:
@@ -347,12 +356,16 @@ for var in gen_var_names:
         mc_var = mc_info[mc_name].LoadVar(var)
         
         pred,_=np.histogram(mc_var,weights=mc_info[mc_name].nominal_wgts,bins=binning,density=True)
-        ax0.plot(xaxis,pred,color=opt.colors[mc],marker=opt.markers[mc],ms=12,lw=0,markerfacecolor='none',markeredgewidth=3,label=mc)
-        ratios[mc] = 100*np.divide(pred-data_pred,data_pred)        
-        #Ratio plot
+        if apply_qed_corr:
+            qed_corr=LoadJson('QED_{}.json'.format(mc))
+            pred = pred*(np.array(qed_corr[var][str(flags.q2_int)]))
         displacement = opt.xaxis_disp[mc]
         xpos = xaxis+np.abs(np.diff(binning)/2.)*displacement
-        ax1.plot(xpos,ratios[mc],color=opt.colors[mc],marker=opt.markers[mc],ms=12,lw=0,markerfacecolor='none',markeredgewidth=3)
+
+        ax0.plot(xpos,pred,color=opt.colors[mc],marker=opt.markers[mc],ms=ms,lw=0,markerfacecolor='none',markeredgewidth=3,label=opt.name_translate[mc])
+        ratios[mc] = 100*np.divide(pred-data_pred,data_pred)        
+        #Ratio plot
+        ax1.plot(xpos,ratios[mc],color=opt.colors[mc],marker=opt.markers[mc],ms=ms,lw=0,markerfacecolor='none',markeredgewidth=3)
 
     if flags.closure ==False and flags.plot_reco==False:
         for mc_name in standalone_predictions:
@@ -365,16 +378,16 @@ for var in gen_var_names:
             displacement = opt.xaxis_disp[mc_name]
             xpos = xaxis+np.abs(np.diff(binning)/2.)*displacement
             ax0.plot(xpos,pred,color=opt.colors[mc_name],marker=opt.markers[mc_name],
-                     ms=12,lw=0,markerfacecolor='none',markeredgewidth=3,label=opt.name_translate[mc_name])
+                     ms=ms,lw=0,markerfacecolor='none',markeredgewidth=3,label=opt.name_translate[mc_name])
             ratios[mc_name] = 100*np.divide(pred-data_pred,data_pred)
             #Ratio plot    
             ax2.plot(xpos,ratios[mc_name],color=opt.colors[mc_name],marker=opt.markers[mc_name],
-                     ms=12,lw=0,markerfacecolor='none',markeredgewidth=3)
+                     ms=ms,lw=0,markerfacecolor='none',markeredgewidth=3)
         
     
     handles, labels = ax0.get_legend_handles_labels()
     order = [len(labels)-1] + list(range(0,len(labels)-1))
-    ax0.legend([handles[idx] for idx in order],[labels[idx] for idx in order],loc='upper left',fontsize=16,ncol=2)
+    ax0.legend([handles[idx] for idx in order],[labels[idx] for idx in order],loc='upper left',fontsize=12,ncol=2)
     #ax0.legend()
     RatioLabel(ax1,var)
     if flags.plot_reco == False and flags.closure==False:
@@ -435,7 +448,8 @@ for var in gen_var_names:
         
         data_var = mc_info[data_name].LoadVar(var)
         for train in weights_data:
-            pred,_,_ = ax0.hist(data_var,weights=weights_data[train]*mc_info[data_name].nominal_wgts,bins=binning,
+            pred,_,_ = ax0.hist(data_var,weights=weights_data[train]*mc_info[data_name].nominal_wgts,
+                                bins=binning,
                                 label=train,density=True,color=opt.colors[train],histtype="step")
             ratios[train] = 100*np.divide(mc_pred-pred,pred)
             

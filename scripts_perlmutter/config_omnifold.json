@@ -1,9 +1,9 @@
 {'General': {
-    'NITER': 15,
-    'LR': 1e-5,
-    'BATCH_SIZE': 2048,
-    'EPOCHS': 100,
-    'NWARMUP': 3,
+    'NITER': 7,
+    'LR': 1e-4,
+    'BATCH_SIZE': 6250,
+    'EPOCHS': 150,
+    'NWARMUP': 5,
     'NPATIENCE': 10,
 },
 'PCT': {

@@ -62,8 +62,6 @@ class Multifold():
         self.global_vars = None
         self.data=None
 
-        # tf.random.set_seed(19874*self.nstrap)
-        # np.random.seed(19874*self.nstrap)
         self.weights_folder = '../weights'
         if self.nstrap>0:
             self.weights_folder = '../weights_strap'
@@ -119,7 +117,7 @@ class Multifold():
             
         new_weights[self.not_pass_reco]=1.0
         self.weights_pull = self.weights_push *new_weights
-        self.weights_pull = self.weights_pull/np.average(self.weights_pull)
+        # self.weights_pull = self.weights_pull/np.average(self.weights_pull)
 
     def RunStep2(self,i):
         '''Gen to Gen reweighing'''        
@@ -133,7 +131,7 @@ class Multifold():
         self.RunModel(
             np.concatenate((self.mc_gen, self.mc_gen)),
             np.concatenate((self.labels_mc, self.labels_gen)),
-            np.concatenate((np.ones(self.weights_mc.shape), self.weights_pull)),
+            np.concatenate((self.weights_mc, self.weights_mc*self.weights_pull)),
             i,self.model2,stepn=2,
             global_vars=global_vars
         )
@@ -146,7 +144,7 @@ class Multifold():
 
         new_weights[self.not_pass_gen]=1.0
         self.weights_push = new_weights
-        self.weights_push = self.weights_push/np.average(self.weights_push)
+        # self.weights_push = self.weights_push/np.average(self.weights_push)
 
     def RunModel(self,sample,labels,weights,iteration,model,stepn,global_vars=None):
         
@@ -190,10 +188,10 @@ class Multifold():
         callbacks = [
             hvd.callbacks.BroadcastGlobalVariablesCallback(0),
             hvd.callbacks.MetricAverageCallback(),
-            hvd.callbacks.LearningRateWarmupCallback(
-                initial_lr=self.hvd_lr, warmup_epochs=self.opt['General']['NWARMUP'],
-                verbose=verbose),
-            ReduceLROnPlateau(patience=5, min_lr=1e-7,verbose=verbose),
+            # hvd.callbacks.LearningRateWarmupCallback(
+            #     initial_lr=self.hvd_lr, warmup_epochs=self.opt['General']['NWARMUP'],
+            #     verbose=verbose),
+            ReduceLROnPlateau(patience=8, min_lr=1e-7,verbose=verbose),
             EarlyStopping(patience=self.opt['General']['NPATIENCE'],restore_best_weights=True)
         ]
         
@@ -252,7 +250,7 @@ class Multifold():
 
     def CompileModel(self,lr):
         #self.hvd_lr = lr*np.sqrt(hvd.size())
-        self.hvd_lr = lr*hvd.size()
+        self.hvd_lr = lr
         opt = tensorflow.keras.optimizers.Adam(learning_rate=self.hvd_lr)
         opt = hvd.DistributedOptimizer(
             opt, average_aggregated_gradients=True)
